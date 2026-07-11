@@ -1,9 +1,9 @@
 # Beagrid — Local Development Compose
 #
 # Usage:
-#   docker compose up                  # server + ollama + agent (default stack)
-#   docker compose up server           # server only (for testing with external engines)
-#   docker compose --profile gpu up    # enable GPU passthrough for Ollama
+#   docker compose up                      # server + agent → 10.0.0.98 Ollama (default)
+#   docker compose --profile local up      # server + local ollama + agent → local ollama
+#   docker compose --profile gpu up        # server + local ollama (GPU) + agent → local ollama
 #
 # The server UI is at http://localhost:8090/ui/
 
@@ -18,7 +18,7 @@ services:
     command:
       - --port=8090
       - --name=home
-      - --node-ttl=60
+      - --node-ttl=120
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/healthz"]
       interval: 5s
@@ -26,9 +26,28 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Ollama instance (simulates a GPU node)
+  # Beagrid agent — registers 10.0.0.98 Windows Ollama with the server (DEFAULT)
+  agent:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.agent
+    command:
+      - --server=http://server:8090
+      - --ollama=http://10.0.0.98:11434
+      - --name=windows-gpu
+      - --heartbeat-interval=15
+      - --poll-interval=300
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # --- LOCAL PROFILE: Use when 10.0.0.98 is not available ---
+
+  # Local Ollama instance (CPU only)
   ollama:
     image: ollama/ollama:latest
+    profiles: ["local"]
     ports:
       - "11434:11434"
     volumes:
@@ -40,7 +59,25 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Ollama with GPU passthrough
+  # Agent pointing at local Ollama (only with local profile)
+  agent-local:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.agent
+    profiles: ["local"]
+    command:
+      - --server=http://server:8090
+      - --ollama=http://ollama:11434
+      - --name=local-ollama
+      - --heartbeat-interval=15
+    depends_on:
+      server:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Local Ollama with GPU passthrough
   ollama-gpu:
     image: ollama/ollama:latest
     profiles: ["gpu"]
@@ -60,23 +97,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    restart: unless-stopped
-
-  # Beagrid agent — discovers Ollama and registers with server
-  agent:
-    build:
-      context: .
-      dockerfile: deploy/Dockerfile.agent
-    command:
-      - --server=http://server:8090
-      - --ollama=http://ollama:11434
-      - --name=ollama-node
-      - --heartbeat-interval=10
-    depends_on:
-      server:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
     restart: unless-stopped
 
 volumes:
