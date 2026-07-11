@@ -88,7 +88,6 @@
         Beagrid
     </div>
     <div class="header-right">
-        <a href="/stats.html" style="color:var(--text-dim);text-decoration:none;font-size:.8rem;padding:.2rem .5rem;border-radius:4px;background:var(--surface-2);">Stats</a>
         <span class="version-badge" id="version-badge">...</span>
         <div class="status-badge"><span class="pulse" id="pulse-dot"></span><span id="connection-status">...</span></div>
         <button class="settings-btn" onclick="openSettings()" title="Settings">
@@ -148,6 +147,7 @@
         <button class="active" onclick="switchTab('engines')">Engines</button>
         <button onclick="switchTab('topology')">Topology</button>
         <button onclick="switchTab('models')">Models</button>
+        <button onclick="switchTab('stats')">Statistics</button>
     </nav>
 
     <!-- Tab: Engines -->
@@ -167,6 +167,30 @@
     <div class="tab-content" id="tab-models">
         <div class="models-grid" id="models-grid">
             <div class="empty-state"><h2>No models available</h2></div>
+        </div>
+    </div>
+
+    <!-- Tab: Statistics -->
+    <div class="tab-content" id="tab-stats">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+            <div class="stat-card" style="text-align:left">
+                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Model Distribution</h4>
+                <div id="stats-model-chart"></div>
+            </div>
+            <div class="stat-card" style="text-align:left">
+                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Engine Load</h4>
+                <div id="stats-load-chart"></div>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+            <div class="stat-card" style="text-align:left">
+                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Engines Online (last 60 samples)</h4>
+                <div id="stats-timeline" style="display:flex;align-items:flex-end;gap:2px;height:80px"></div>
+            </div>
+            <div class="stat-card" style="text-align:left">
+                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Grid Info</h4>
+                <div id="stats-grid-info"></div>
+            </div>
         </div>
     </div>
 </main>
@@ -258,7 +282,7 @@ async function fetchAll() {
     try {
         const [info,disc,ver]=await Promise.all([fetch(`${API}/grid/info`).then(r=>r.json()),fetch(`${API}/nodes/discover`).then(r=>r.json()),fetch(`${API}/version`).then(r=>r.json())]);
         lastNodes=disc.engines||[];
-        updateVersion(ver); updateStats(info,lastNodes); updateTopology(lastNodes); updateNodes(lastNodes); updateModels(lastNodes);
+        updateVersion(ver); updateStats(info,lastNodes); updateTopology(lastNodes); updateNodes(lastNodes); updateModels(lastNodes); updateStatsTab(info,lastNodes,ver);
         document.getElementById('grid-name').textContent=info.name||'home';
         setConnected(true);
         document.getElementById('refresh-indicator').textContent=`Updated ${new Date().toLocaleTimeString()}`;
@@ -311,6 +335,50 @@ function updateModels(nodes){
 }
 function timeAgo(ts){if(!ts)return'-';const d=(Date.now()-new Date(ts).getTime())/1000;return d<60?Math.round(d)+'s':d<3600?Math.round(d/60)+'m':Math.round(d/3600)+'h';}
 function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+
+// --- Stats Tab ---
+let heartbeatHistory = [];
+function updateStatsTab(info, nodes, ver) {
+    // Heartbeat timeline
+    heartbeatHistory.push(nodes.length);
+    if (heartbeatHistory.length > 60) heartbeatHistory.shift();
+    const maxH = Math.max(...heartbeatHistory, 1);
+    document.getElementById('stats-timeline').innerHTML = heartbeatHistory
+        .map(v => `<div style="flex:1;min-width:3px;height:${Math.max((v/maxH)*100,5)}%;background:var(--accent);border-radius:2px 2px 0 0;opacity:.7" title="${v} engines"></div>`)
+        .join('');
+
+    // Model distribution
+    const modelCount = {};
+    nodes.forEach(n => (n.models||[]).forEach(m => { modelCount[m] = (modelCount[m]||0) + 1; }));
+    const maxM = Math.max(...Object.values(modelCount), 1);
+    document.getElementById('stats-model-chart').innerHTML = Object.entries(modelCount)
+        .sort((a,b) => b[1]-a[1]).slice(0, 8)
+        .map(([m,c]) => `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+            <span style="font-size:.7rem;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;color:var(--text-dim)" title="${esc(m)}">${esc(m)}</span>
+            <div style="flex:1;height:18px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${(c/maxM)*100}%;background:var(--accent);border-radius:3px;display:flex;align-items:center;padding-left:.3rem"><span style="font-size:.6rem;color:white;font-weight:600">${c}</span></div></div>
+        </div>`).join('') || '<div style="color:var(--text-dim);font-size:.8rem">No models</div>';
+
+    // Engine load
+    const maxL = Math.max(...nodes.map(n => n.load?.active_tasks||0), 1);
+    document.getElementById('stats-load-chart').innerHTML = nodes.map(n => {
+        const load = n.load?.active_tasks || 0;
+        const color = load > 3 ? 'var(--yellow)' : load > 0 ? 'var(--accent)' : 'var(--green)';
+        return `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
+            <span style="font-size:.7rem;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim)">${esc((n.name||'?').slice(0,12))}</span>
+            <div style="flex:1;height:18px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.max((load/maxL)*100,8)}%;background:${color};border-radius:3px;display:flex;align-items:center;padding-left:.3rem"><span style="font-size:.6rem;color:white;font-weight:600">${load}</span></div></div>
+        </div>`;
+    }).join('') || '<div style="color:var(--text-dim);font-size:.8rem">No engines</div>';
+
+    // Grid info
+    document.getElementById('stats-grid-info').innerHTML = `
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">Grid ID</span><span style="font-family:monospace;font-size:.7rem">${info.grid_id}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">Name</span><span>${info.name}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">Type</span><span>${info.grid_type}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">Node TTL</span><span>${info.node_ttl_seconds}s</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">Version</span><span>${ver.version}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:.35rem 0;font-size:.8rem"><span style="color:var(--text-dim)">Uptime</span><span>${ver.uptime||'-'}</span></div>
+    `;
+}
 
 // Init
 loadTheme(); loadCustomThemes();
