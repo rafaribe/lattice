@@ -36,6 +36,27 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install svu
+        run: go install github.com/caarlos0/svu@latest
+
+      - name: Calculate version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=$(svu next 2>/dev/null || echo "0.1.0")
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
 
       - name: Docker meta
         id: meta
@@ -43,10 +64,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/beagrid-server
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,prefix=
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.version }},suffix=-{{sha}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/setup-qemu-action@v3
@@ -71,7 +90,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ steps.version.outputs.version }}
             REVISION=${{ github.sha }}
 
   build-agent:
@@ -81,6 +100,26 @@ jobs:
     if: github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install svu
+        run: go install github.com/caarlos0/svu@latest
+
+      - name: Calculate version
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            VERSION="${VERSION#v}"
+          else
+            VERSION=$(svu next 2>/dev/null || echo "0.1.0")
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Docker meta
         id: meta
@@ -88,10 +127,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/beagrid-agent
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha,prefix=
+            type=raw,value=${{ steps.version.outputs.version }}
+            type=raw,value=${{ steps.version.outputs.version }},suffix=-{{sha}}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - uses: docker/setup-qemu-action@v3
@@ -116,19 +153,5 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            VERSION=${{ github.ref_name }}
+            VERSION=${{ steps.version.outputs.version }}
             REVISION=${{ github.sha }}
-
-  release:
-    name: Create Release
-    needs: [build-server, build-agent]
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true

@@ -1,0 +1,91 @@
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Release CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cmd/beagrid/**"
+      - "internal/**"
+      - "go.mod"
+      - "go.sum"
+      - ".github/workflows/release-cli.yaml"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release CLI Binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # svu needs full history for semver calculation
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install svu
+        run: |
+          go install github.com/caarlos0/svu@latest
+
+      - name: Calculate next version
+        id: version
+        run: |
+          CURRENT=$(svu current 2>/dev/null || echo "0.0.0")
+          NEXT=$(svu next 2>/dev/null || echo "0.1.0")
+          echo "current=${CURRENT}" >> $GITHUB_OUTPUT
+          echo "next=${NEXT}" >> $GITHUB_OUTPUT
+          echo "Current: ${CURRENT}, Next: ${NEXT}"
+
+      - name: Run tests
+        run: go test ./... -race -count=1
+
+      - name: Build CLI binaries (multi-platform)
+        env:
+          VERSION: ${{ steps.version.outputs.next }}
+        run: |
+          LDFLAGS="-s -w -X main.version=${VERSION}"
+          mkdir -p dist
+
+          # Linux
+          GOOS=linux GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-linux-amd64 ./cmd/beagrid
+          GOOS=linux GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-linux-arm64 ./cmd/beagrid
+
+          # macOS
+          GOOS=darwin GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-darwin-amd64 ./cmd/beagrid
+          GOOS=darwin GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-darwin-arm64 ./cmd/beagrid
+
+          # Windows
+          GOOS=windows GOARCH=amd64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-windows-amd64.exe ./cmd/beagrid
+          GOOS=windows GOARCH=arm64 go build -ldflags="${LDFLAGS}" -o dist/beagrid-windows-arm64.exe ./cmd/beagrid
+
+          # Generate checksums
+          cd dist && sha256sum * > checksums.txt
+
+      - name: Create git tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.next }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "Release v${VERSION}"
+          git push origin "v${VERSION}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.next }}
+          name: v${{ steps.version.outputs.next }}
+          generate_release_notes: true
+          files: |
+            dist/beagrid-linux-amd64
+            dist/beagrid-linux-arm64
+            dist/beagrid-darwin-amd64
+            dist/beagrid-darwin-arm64
+            dist/beagrid-windows-amd64.exe
+            dist/beagrid-windows-arm64.exe
+            dist/checksums.txt

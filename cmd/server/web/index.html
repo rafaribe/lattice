@@ -33,6 +33,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 0.5rem;
         }
         .logo {
             display: flex;
@@ -42,6 +44,16 @@
             font-weight: 700;
         }
         .logo svg { width: 32px; height: 32px; }
+        .header-right { display: flex; align-items: center; gap: 1rem; }
+        .version-badge {
+            padding: 0.3rem 0.7rem;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: monospace;
+            color: var(--text-dim);
+        }
         .status-badge {
             display: flex;
             align-items: center;
@@ -57,14 +69,12 @@
             background: var(--green);
             animation: pulse 2s infinite;
         }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.4; }
-        }
+        .pulse.offline { background: var(--red); animation: none; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
         main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 1rem;
             margin-bottom: 2rem;
         }
@@ -75,16 +85,8 @@
             padding: 1.25rem;
             text-align: center;
         }
-        .stat-value {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--accent);
-        }
-        .stat-label {
-            font-size: 0.85rem;
-            color: var(--text-dim);
-            margin-top: 0.25rem;
-        }
+        .stat-value { font-size: 2.5rem; font-weight: 700; color: var(--accent); }
+        .stat-label { font-size: 0.85rem; color: var(--text-dim); margin-top: 0.25rem; }
         .section-title {
             font-size: 1.2rem;
             font-weight: 600;
@@ -93,6 +95,18 @@
             align-items: center;
             gap: 0.5rem;
         }
+        .topology-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 300px;
+        }
+        .topology-container svg { max-width: 100%; height: auto; }
         .nodes-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
@@ -117,20 +131,15 @@
             position: absolute;
             top: 0; left: 0; right: 0;
             height: 3px;
+            background: var(--green);
         }
-        .node-card.online::before { background: var(--green); }
-        .node-card.offline::before { background: var(--red); }
-        .node-card.draining::before { background: var(--yellow); }
         .node-header {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
             margin-bottom: 1rem;
         }
-        .node-name {
-            font-size: 1.1rem;
-            font-weight: 600;
-        }
+        .node-name { font-size: 1.1rem; font-weight: 600; }
         .node-id { font-size: 0.75rem; color: var(--text-dim); font-family: monospace; }
         .node-status {
             padding: 0.25rem 0.75rem;
@@ -138,10 +147,9 @@
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--green);
         }
-        .node-status.online { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-        .node-status.offline { background: rgba(239, 68, 68, 0.15); color: var(--red); }
-        .node-status.draining { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
         .node-meta {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -151,11 +159,7 @@
         }
         .node-meta dt { color: var(--text-dim); }
         .node-meta dd { color: var(--text); font-weight: 500; }
-        .model-tags {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.4rem;
-        }
+        .model-tags { display: flex; flex-wrap: wrap; gap: 0.4rem; }
         .model-tag {
             background: var(--surface-2);
             border: 1px solid var(--border);
@@ -170,63 +174,31 @@
             color: var(--text-dim);
         }
         .empty-state h2 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); }
-        .topology {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            min-height: 200px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        .topo-server {
-            width: 80px; height: 80px;
-            background: var(--accent);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 0.7rem;
-            text-align: center;
-            box-shadow: 0 0 30px var(--accent-glow);
-            position: relative;
-            z-index: 2;
-        }
-        .topo-nodes {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-        }
-        .topo-node {
-            position: absolute;
-            width: 50px; height: 50px;
+        .empty-state code {
             background: var(--surface-2);
-            border: 2px solid var(--green);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.6rem;
-            font-weight: 600;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85rem;
         }
-        .topo-node.offline { border-color: var(--red); opacity: 0.5; }
-        .topo-line {
-            position: absolute;
-            background: var(--border);
-            height: 2px;
-            transform-origin: left center;
-            z-index: 1;
+        .refresh-indicator {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-align: right;
+            margin-bottom: 0.5rem;
         }
-        .topo-line.active { background: var(--green); }
         footer {
             text-align: center;
             padding: 2rem;
             color: var(--text-dim);
             font-size: 0.8rem;
             border-top: 1px solid var(--border);
+        }
+        @media (max-width: 768px) {
+            header { padding: 0.75rem 1rem; }
+            main { padding: 1rem; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .nodes-grid { grid-template-columns: 1fr; }
+            .stat-value { font-size: 2rem; }
         }
     </style>
 </head>
@@ -247,152 +219,202 @@
             </svg>
             Beagrid
         </div>
-        <div class="status-badge">
-            <span class="pulse"></span>
-            <span id="connection-status">Connecting...</span>
+        <div class="header-right">
+            <span class="version-badge" id="version-badge">...</span>
+            <div class="status-badge">
+                <span class="pulse" id="pulse-dot"></span>
+                <span id="connection-status">Connecting...</span>
+            </div>
         </div>
     </header>
     <main>
         <div class="stats-grid">
             <div class="stat-card">
                 <div class="stat-value" id="stat-nodes">-</div>
-                <div class="stat-label">Online Nodes</div>
+                <div class="stat-label">Engines Online</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-models">-</div>
                 <div class="stat-label">Unique Models</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-total">-</div>
-                <div class="stat-label">Total Engines</div>
+                <div class="stat-value" id="stat-tasks">-</div>
+                <div class="stat-label">Active Tasks</div>
             </div>
             <div class="stat-card">
-                <div class="stat-value" id="stat-requests">-</div>
+                <div class="stat-value" id="stat-ttl">-</div>
                 <div class="stat-label">Node TTL</div>
             </div>
         </div>
 
         <h2 class="section-title">🌐 Grid Topology</h2>
-        <div class="topology" id="topology">
-            <div class="topo-server">BEAGRID<br>SERVER</div>
-            <div class="topo-nodes" id="topo-nodes"></div>
+        <div class="topology-container" id="topology-container">
+            <svg id="topology-svg" viewBox="0 0 500 300" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
 
-        <h2 class="section-title">⚡ Connected Nodes</h2>
+        <div class="refresh-indicator" id="refresh-indicator">Last refresh: -</div>
+        <h2 class="section-title">⚡ Connected Engines</h2>
         <div class="nodes-grid" id="nodes-grid">
             <div class="empty-state">
-                <h2>No nodes connected</h2>
-                <p>Start an agent with: <code>beagrid-agent --server http://this-server:8080 --ollama http://localhost:11434</code></p>
+                <h2>No engines connected</h2>
+                <p>Run: <code>beagrid join --at http://your-ollama:11434/v1 -m llama3.2:latest</code></p>
             </div>
         </div>
     </main>
-    <footer>Beagrid — Open-source inference grid for Ollama</footer>
+    <footer>Beagrid — Open-source inference grid • <span id="grid-name">home</span></footer>
+
     <script>
-        const API_BASE = window.location.origin;
-        let refreshInterval;
+    const API = window.location.origin;
+    let lastRefresh = null;
 
-        async function fetchData() {
-            try {
-                const [infoRes, discoverRes] = await Promise.all([
-                    fetch(`${API_BASE}/grid/info`),
-                    fetch(`${API_BASE}/nodes/discover`)
-                ]);
-                const info = await infoRes.json();
-                const discover = await discoverRes.json();
-                const nodes = discover.engines || [];
+    async function fetchAll() {
+        try {
+            const [infoRes, discoverRes, versionRes] = await Promise.all([
+                fetch(`${API}/grid/info`),
+                fetch(`${API}/nodes/discover`),
+                fetch(`${API}/version`),
+            ]);
+            const info = await infoRes.json();
+            const discover = await discoverRes.json();
+            const ver = await versionRes.json();
+            const nodes = discover.engines || [];
 
-                updateStats(info, nodes);
-                updateNodes(nodes);
-                updateTopology(nodes);
-                document.getElementById('connection-status').textContent = 'Connected';
-            } catch (err) {
-                document.getElementById('connection-status').textContent = 'Disconnected';
-            }
+            updateVersion(ver);
+            updateStats(info, nodes);
+            updateTopology(nodes);
+            updateNodes(nodes);
+            updateFooter(info);
+            setConnected(true);
+            lastRefresh = new Date();
+            document.getElementById('refresh-indicator').textContent = `Last refresh: ${lastRefresh.toLocaleTimeString()}`;
+        } catch (err) {
+            setConnected(false);
+        }
+    }
+
+    function setConnected(ok) {
+        document.getElementById('connection-status').textContent = ok ? 'Connected' : 'Disconnected';
+        document.getElementById('pulse-dot').className = ok ? 'pulse' : 'pulse offline';
+    }
+
+    function updateVersion(ver) {
+        document.getElementById('version-badge').textContent = `v${ver.version || 'dev'}`;
+    }
+
+    function updateFooter(info) {
+        document.getElementById('grid-name').textContent = info.name || 'home';
+    }
+
+    function updateStats(info, nodes) {
+        document.getElementById('stat-nodes').textContent = info.engines_online || 0;
+        const models = new Set();
+        let totalTasks = 0;
+        nodes.forEach(n => {
+            (n.models || []).forEach(m => models.add(m));
+            totalTasks += n.load?.active_tasks || 0;
+        });
+        document.getElementById('stat-models').textContent = models.size;
+        document.getElementById('stat-tasks').textContent = totalTasks;
+        document.getElementById('stat-ttl').textContent = (info.node_ttl_seconds || 60) + 's';
+    }
+
+    function updateTopology(nodes) {
+        const svg = document.getElementById('topology-svg');
+        if (!nodes || nodes.length === 0) {
+            svg.innerHTML = `
+                <text x="250" y="150" text-anchor="middle" fill="#8b92a5" font-size="14">No engines connected</text>
+            `;
+            return;
         }
 
-        function updateStats(info, nodes) {
-            document.getElementById('stat-nodes').textContent = info.engines_online || 0;
-            const models = new Set();
-            nodes.forEach(n => (n.models || []).forEach(m => models.add(m)));
-            document.getElementById('stat-models').textContent = models.size;
-            document.getElementById('stat-total').textContent = nodes.length;
-            document.getElementById('stat-requests').textContent = info.node_ttl_seconds + 's TTL';
-        }
+        const cx = 250, cy = 150, radius = 110;
+        let html = '';
 
-        function updateNodes(nodes) {
-            const grid = document.getElementById('nodes-grid');
-            if (!nodes || nodes.length === 0) {
-                grid.innerHTML = `<div class="empty-state"><h2>No engines connected</h2><p>Run: <code>beagrid join --at http://your-ollama:11434/v1 -m llama3.2:latest</code></p></div>`;
-                return;
-            }
-            grid.innerHTML = nodes.map(node => {
-                const status = 'online';
-                const name = node.name || node.node_id || '?';
-                return `
-                <div class="node-card ${status}">
-                    <div class="node-header">
-                        <div>
-                            <div class="node-name">${escHtml(name)}</div>
-                            <div class="node-id">${node.node_id || ''}</div>
-                        </div>
-                        <span class="node-status ${status}">${status}</span>
+        // Draw lines from center to each node
+        nodes.forEach((node, i) => {
+            const angle = (2 * Math.PI * i / nodes.length) - Math.PI / 2;
+            const nx = cx + radius * Math.cos(angle);
+            const ny = cy + radius * Math.sin(angle);
+            html += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="#2d3248" stroke-width="2" stroke-dasharray="4,4"/>`;
+            html += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="#10b981" stroke-width="1.5" opacity="0.6">
+                <animate attributeName="stroke-dashoffset" from="20" to="0" dur="2s" repeatCount="indefinite"/>
+            </line>`;
+        });
+
+        // Draw node circles
+        nodes.forEach((node, i) => {
+            const angle = (2 * Math.PI * i / nodes.length) - Math.PI / 2;
+            const nx = cx + radius * Math.cos(angle);
+            const ny = cy + radius * Math.sin(angle);
+            const name = (node.name || 'node').slice(0, 8);
+            const modelCount = (node.models || []).length;
+            html += `
+                <circle cx="${nx}" cy="${ny}" r="24" fill="#242836" stroke="#10b981" stroke-width="2"/>
+                <text x="${nx}" y="${ny - 4}" text-anchor="middle" fill="#e4e7ec" font-size="9" font-weight="600">${esc(name)}</text>
+                <text x="${nx}" y="${ny + 10}" text-anchor="middle" fill="#8b92a5" font-size="8">${modelCount} model${modelCount !== 1 ? 's' : ''}</text>
+            `;
+        });
+
+        // Draw server center
+        html += `
+            <circle cx="${cx}" cy="${cy}" r="30" fill="#6366f1" opacity="0.9"/>
+            <circle cx="${cx}" cy="${cy}" r="30" fill="none" stroke="#6366f1" stroke-width="2">
+                <animate attributeName="r" values="30;34;30" dur="3s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="1;0.3;1" dur="3s" repeatCount="indefinite"/>
+            </circle>
+            <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="white" font-size="9" font-weight="700">BEAGRID</text>
+            <text x="${cx}" y="${cy + 9}" text-anchor="middle" fill="white" font-size="8" opacity="0.8">SERVER</text>
+        `;
+
+        svg.innerHTML = html;
+    }
+
+    function updateNodes(nodes) {
+        const grid = document.getElementById('nodes-grid');
+        if (!nodes || nodes.length === 0) {
+            grid.innerHTML = `<div class="empty-state"><h2>No engines connected</h2><p>Run: <code>beagrid join --at http://your-ollama:11434/v1 -m llama3.2:latest</code></p></div>`;
+            return;
+        }
+        grid.innerHTML = nodes.map(node => {
+            const name = node.name || node.node_id || '?';
+            return `
+            <div class="node-card">
+                <div class="node-header">
+                    <div>
+                        <div class="node-name">${esc(name)}</div>
+                        <div class="node-id">${node.node_id || ''}</div>
                     </div>
-                    <dl class="node-meta">
-                        <dt>Role</dt><dd>${node.role || 'engine'}</dd>
-                        <dt>Last Seen</dt><dd>${timeAgo(node.last_heartbeat)}</dd>
-                        <dt>Active Tasks</dt><dd>${node.load?.active_tasks || 0}</dd>
-                        <dt>Endpoint</dt><dd style="font-size:0.7rem;word-break:break-all">${escHtml(node.endpoint_url || node.media_url || '-')}</dd>
-                    </dl>
-                    <div class="model-tags">
-                        ${(node.models || []).map(m => `<span class="model-tag">${escHtml(m)}</span>`).join('')}
-                    </div>
+                    <span class="node-status">online</span>
                 </div>
-            `}).join('');
-        }
+                <dl class="node-meta">
+                    <dt>Role</dt><dd>${node.role || 'engine'}</dd>
+                    <dt>Last Seen</dt><dd>${timeAgo(node.last_heartbeat)}</dd>
+                    <dt>Active Tasks</dt><dd>${node.load?.active_tasks || 0}</dd>
+                    <dt>Endpoint</dt><dd style="font-size:0.7rem;word-break:break-all">${esc(node.endpoint_url || node.media_url || '-')}</dd>
+                </dl>
+                <div class="model-tags">
+                    ${(node.models || []).map(m => `<span class="model-tag">${esc(m)}</span>`).join('')}
+                </div>
+            </div>`;
+        }).join('');
+    }
 
-        function updateTopology(nodes) {
-            const container = document.getElementById('topo-nodes');
-            if (!nodes || nodes.length === 0) {
-                container.innerHTML = '';
-                return;
-            }
-            const cx = container.offsetWidth / 2;
-            const cy = container.offsetHeight / 2;
-            const radius = Math.min(cx, cy) - 40;
-            let html = '';
-            nodes.forEach((node, i) => {
-                const angle = (2 * Math.PI * i / nodes.length) - Math.PI / 2;
-                const x = cx + radius * Math.cos(angle) - 25;
-                const y = cy + radius * Math.sin(angle) - 25;
-                const lx = cx;
-                const ly = cy;
-                const nx = x + 25;
-                const ny = y + 25;
-                const length = Math.sqrt((nx-lx)**2 + (ny-ly)**2);
-                const angleD = Math.atan2(ny-ly, nx-lx) * 180 / Math.PI;
-                const statusClass = node.status === 'online' ? 'active' : '';
-                html += `<div class="topo-line ${statusClass}" style="left:${lx}px;top:${ly}px;width:${length}px;transform:rotate(${angleD}deg)"></div>`;
-                html += `<div class="topo-node ${node.status}" style="left:${x}px;top:${y}px" title="${escHtml(node.name)}">${escHtml(node.name.slice(0,6))}</div>`;
-            });
-            container.innerHTML = html;
-        }
+    function timeAgo(ts) {
+        if (!ts) return 'never';
+        const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+        if (diff < 60) return `${Math.round(diff)}s ago`;
+        if (diff < 3600) return `${Math.round(diff/60)}m ago`;
+        return `${Math.round(diff/3600)}h ago`;
+    }
 
-        function timeAgo(ts) {
-            if (!ts) return 'never';
-            const diff = (Date.now() - new Date(ts).getTime()) / 1000;
-            if (diff < 60) return `${Math.round(diff)}s ago`;
-            if (diff < 3600) return `${Math.round(diff/60)}m ago`;
-            return `${Math.round(diff/3600)}h ago`;
-        }
+    function esc(s) {
+        const d = document.createElement('div');
+        d.textContent = s || '';
+        return d.innerHTML;
+    }
 
-        function escHtml(s) {
-            const d = document.createElement('div');
-            d.textContent = s || '';
-            return d.innerHTML;
-        }
-
-        fetchData();
-        refreshInterval = setInterval(fetchData, 5000);
+    fetchAll();
+    setInterval(fetchAll, 5000);
     </script>
 </body>
 </html>

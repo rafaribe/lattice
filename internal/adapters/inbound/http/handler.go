@@ -9,8 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/rafaribe/beagrid/internal/application"
 	"github.com/rafaribe/beagrid/internal/domain"
+)
+
+const (
+	maxBodyNode        = 1 << 20  // 1 MB for node operations
+	maxBodyCompletions = 10 << 20 // 10 MB for completions (multi-turn)
 )
 
 // Handler provides all HTTP endpoints for the beagrid server.
@@ -19,21 +25,31 @@ type Handler struct {
 	registry application.NodeRegistry
 	proxy    application.EngineProxy
 	logger   *slog.Logger
+	version  string
+	startAt  time.Time
 }
 
 // NewHandler creates a new HTTP inbound adapter.
-func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy, logger *slog.Logger) *Handler {
+func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy, logger *slog.Logger, version string) *Handler {
 	return &Handler{
 		registry: registry,
 		proxy:    proxy,
 		logger:   logger,
+		version:  version,
+		startAt:  time.Now(),
 	}
 }
 
 // RegisterRoutes wires all HTTP routes to the handler methods.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
+	// Root → grid info (like autonomous-grid)
+	mux.HandleFunc("GET /{$}", h.handleGridInfo)
+
 	// Grid info
 	mux.HandleFunc("GET /grid/info", h.handleGridInfo)
+
+	// Server metadata
+	mux.HandleFunc("GET /version", h.handleVersion)
 
 	// Node lifecycle
 	mux.HandleFunc("POST /nodes", h.handleCreateNode)
@@ -54,21 +70,48 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 	// Health
 	mux.HandleFunc("GET /healthz", h.handleHealth)
+	mux.HandleFunc("GET /readyz", h.handleReady)
 
 	// Legacy aliases
 	mux.HandleFunc("GET /api/v1/nodes", h.handleDiscoverLegacy)
 	mux.HandleFunc("GET /api/v1/grid/info", h.handleGridInfo)
 }
 
+// --- Middleware ---
+
+// RequestIDMiddleware adds a unique request ID to each request for tracing.
+func RequestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := r.Header.Get("X-Request-ID")
+		if id == "" {
+			id = uuid.New().String()
+		}
+		w.Header().Set("X-Request-ID", id)
+		next.ServeHTTP(w, r)
+	})
+}
+
 // --- Grid Info ---
 
 func (h *Handler) handleGridInfo(w http.ResponseWriter, _ *http.Request) {
-	h.writeJSON(w, h.registry.Info(), http.StatusOK)
+	info := h.registry.Info()
+	h.writeJSON(w, info, http.StatusOK)
+}
+
+// --- Version ---
+
+func (h *Handler) handleVersion(w http.ResponseWriter, _ *http.Request) {
+	h.writeJSON(w, map[string]any{
+		"version": h.version,
+		"uptime":  time.Since(h.startAt).String(),
+	}, http.StatusOK)
 }
 
 // --- Node Lifecycle ---
 
 func (h *Handler) handleCreateNode(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyNode)
+
 	var req domain.NodeCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
@@ -80,11 +123,18 @@ func (h *Handler) handleCreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.Info("node created", "node_id", resp.NodeID, "role", resp.Role)
-	h.writeJSON(w, resp, http.StatusOK)
+	h.writeJSON(w, resp, http.StatusCreated)
 }
 
 func (h *Handler) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyNode)
 	nodeID := r.PathValue("node_id")
+
+	if nodeID == "" {
+		h.openaiError(w, 400, "node_id is required", "invalid_request")
+		return
+	}
+
 	var req domain.NodeUpdateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
@@ -117,36 +167,55 @@ func (h *Handler) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyNode)
+
 	var req domain.HeartbeatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
+		return
+	}
+	if req.NodeID == "" {
+		h.openaiError(w, 400, "node_id is required", "invalid_request")
 		return
 	}
 	if err := h.registry.Heartbeat(r.Context(), req); err != nil {
 		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
-	h.writeJSON(w, map[string]any{"ttl_seconds": h.registry.TTL()}, http.StatusOK)
+	h.writeJSON(w, map[string]any{
+		"node_id":     req.NodeID,
+		"ttl_seconds": h.registry.TTL(),
+	}, http.StatusOK)
 }
 
 func (h *Handler) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.PathValue("node_id")
+	if nodeID == "" {
+		h.openaiError(w, 400, "node_id is required", "invalid_request")
+		return
+	}
 	if err := h.registry.Delete(r.Context(), nodeID); err != nil {
 		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
 	h.logger.Info("node unregistered", "node_id", nodeID)
-	h.writeJSON(w, map[string]string{"status": "unregistered"}, http.StatusOK)
+	h.writeJSON(w, map[string]string{"status": "unregistered", "node_id": nodeID}, http.StatusOK)
 }
 
 func (h *Handler) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	model := r.URL.Query().Get("model")
 	engines, _ := h.registry.Discover(r.Context(), model)
-	h.writeJSON(w, map[string]any{"engines": engines}, http.StatusOK)
+	if engines == nil {
+		engines = []*domain.Node{}
+	}
+	h.writeJSON(w, map[string]any{"engines": engines, "count": len(engines)}, http.StatusOK)
 }
 
 func (h *Handler) handleDiscoverLegacy(w http.ResponseWriter, r *http.Request) {
 	engines, _ := h.registry.Discover(r.Context(), "")
+	if engines == nil {
+		engines = []*domain.Node{}
+	}
 	h.writeJSON(w, engines, http.StatusOK)
 }
 
@@ -184,6 +253,8 @@ func (h *Handler) handleCompletions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) proxyOpenAI(w http.ResponseWriter, r *http.Request, endpointPath string) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyCompletions)
+
 	rawBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.openaiError(w, 400, "Failed to read request body", "invalid_request")
@@ -224,6 +295,8 @@ func (h *Handler) proxyOpenAI(w http.ResponseWriter, r *http.Request, endpointPa
 // --- Media Proxy ---
 
 func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodyCompletions)
+
 	rawBody, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.openaiError(w, 400, "Failed to read request body", "invalid_request")
@@ -263,6 +336,20 @@ func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	h.writeJSON(w, map[string]string{"status": "ok"}, http.StatusOK)
+}
+
+func (h *Handler) handleReady(w http.ResponseWriter, _ *http.Request) {
+	// Readyz confirms the registry is initialized and accepting traffic
+	info := h.registry.Info()
+	if info == nil {
+		h.writeJSON(w, map[string]string{"status": "not_ready"}, http.StatusServiceUnavailable)
+		return
+	}
+	h.writeJSON(w, map[string]any{
+		"status":         "ready",
+		"engines_online": info.EnginesOnline,
+		"uptime":         time.Since(h.startAt).String(),
+	}, http.StatusOK)
 }
 
 // --- Helpers ---

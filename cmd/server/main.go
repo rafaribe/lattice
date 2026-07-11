@@ -48,7 +48,7 @@ func main() {
 	proxy := engine.NewProxy(logger)
 
 	// Inbound adapter (HTTP handler consumes outbound ports)
-	handler := httpAdapter.NewHandler(reg, proxy, logger)
+	handler := httpAdapter.NewHandler(reg, proxy, logger, version)
 
 	// --- HTTP Mux ---
 	mux := http.NewServeMux()
@@ -63,7 +63,8 @@ func main() {
 	mux.Handle("GET /ui/", http.StripPrefix("/ui/", http.FileServer(http.FS(webContent))))
 	mux.Handle("GET /ui", http.RedirectHandler("/ui/", http.StatusMovedPermanently))
 
-	wrapped := corsMiddleware(mux)
+	// Middleware chain: CORS → Request ID → Mux
+	wrapped := corsMiddleware(httpAdapter.RequestIDMiddleware(mux))
 
 	addr := fmt.Sprintf("%s:%d", *host, *port)
 	logger.Info("beagrid server starting",
@@ -80,7 +81,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
