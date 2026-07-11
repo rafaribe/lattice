@@ -5,610 +5,317 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Beagrid — Inference Grid</title>
     <style>
-        :root, [data-theme="dark"] {
-            --bg: #0f1117;
-            --surface: #1a1d27;
-            --surface-2: #242836;
-            --border: #2d3248;
-            --text: #e4e7ec;
-            --text-dim: #8b92a5;
-            --accent: #6366f1;
-            --accent-glow: rgba(99, 102, 241, 0.3);
-            --green: #10b981;
-            --red: #ef4444;
-            --yellow: #f59e0b;
-            --radius: 10px;
-        }
-        [data-theme="light"] {
-            --bg: #f8f9fc;
-            --surface: #ffffff;
-            --surface-2: #f0f2f5;
-            --border: #e2e5ea;
-            --text: #1a1d27;
-            --text-dim: #6b7280;
-            --accent: #4f46e5;
-            --accent-glow: rgba(79, 70, 229, 0.15);
-            --green: #059669;
-            --red: #dc2626;
-            --yellow: #d97706;
-            --radius: 10px;
-        }
-        [data-theme="nord"] {
-            --bg: #2e3440;
-            --surface: #3b4252;
-            --surface-2: #434c5e;
-            --border: #4c566a;
-            --text: #eceff4;
-            --text-dim: #d8dee9;
-            --accent: #88c0d0;
-            --accent-glow: rgba(136, 192, 208, 0.25);
-            --green: #a3be8c;
-            --red: #bf616a;
-            --yellow: #ebcb8b;
-            --radius: 8px;
-        }
-        [data-theme="dracula"] {
-            --bg: #282a36;
-            --surface: #44475a;
-            --surface-2: #383a4a;
-            --border: #6272a4;
-            --text: #f8f8f2;
-            --text-dim: #bd93f9;
-            --accent: #ff79c6;
-            --accent-glow: rgba(255, 121, 198, 0.25);
-            --green: #50fa7b;
-            --red: #ff5555;
-            --yellow: #f1fa8c;
-            --radius: 8px;
-        }
-        [data-theme="catppuccin-latte"] {
-            --bg: #eff1f5;
-            --surface: #e6e9ef;
-            --surface-2: #dce0e8;
-            --border: #ccd0da;
-            --text: #4c4f69;
-            --text-dim: #6c6f85;
-            --accent: #8839ef;
-            --accent-glow: rgba(136, 57, 239, 0.15);
-            --green: #40a02b;
-            --red: #d20f39;
-            --yellow: #df8e1d;
-            --radius: 10px;
-        }
-        [data-theme="catppuccin-frappe"] {
-            --bg: #303446;
-            --surface: #292c3c;
-            --surface-2: #414559;
-            --border: #51576d;
-            --text: #c6d0f5;
-            --text-dim: #a5adce;
-            --accent: #ca9ee6;
-            --accent-glow: rgba(202, 158, 230, 0.25);
-            --green: #a6d189;
-            --red: #e78284;
-            --yellow: #e5c890;
-            --radius: 10px;
-        }
-        [data-theme="catppuccin-macchiato"] {
-            --bg: #24273a;
-            --surface: #1e2030;
-            --surface-2: #363a4f;
-            --border: #494d64;
-            --text: #cad3f5;
-            --text-dim: #a5adcb;
-            --accent: #c6a0f6;
-            --accent-glow: rgba(198, 160, 246, 0.25);
-            --green: #a6da95;
-            --red: #ed8796;
-            --yellow: #eed49f;
-            --radius: 10px;
-        }
-        [data-theme="catppuccin-mocha"] {
-            --bg: #1e1e2e;
-            --surface: #181825;
-            --surface-2: #313244;
-            --border: #45475a;
-            --text: #cdd6f4;
-            --text-dim: #a6adc8;
-            --accent: #cba6f7;
-            --accent-glow: rgba(203, 166, 247, 0.25);
-            --green: #a6e3a1;
-            --red: #f38ba8;
-            --yellow: #f9e2af;
-            --radius: 10px;
-        }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100vh;
-            transition: background 0.3s, color 0.3s;
-        }
-        header {
-            background: var(--surface);
-            border-bottom: 1px solid var(--border);
-            padding: 0.75rem 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-        }
-        .logo { display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; font-weight: 700; }
-        .logo svg { width: 26px; height: 26px; }
-        .header-right { display: flex; align-items: center; gap: 0.75rem; }
-        .version-badge {
-            padding: 0.2rem 0.5rem;
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-family: monospace;
-            color: var(--text-dim);
-        }
-        .status-badge {
-            display: flex; align-items: center; gap: 0.4rem;
-            padding: 0.3rem 0.7rem;
-            background: var(--surface-2);
-            border-radius: 99px;
-            font-size: 0.8rem;
-        }
-        .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
-        .pulse.offline { background: var(--red); animation: none; }
-        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
-
-        /* Settings button */
-        .settings-btn {
-            background: var(--surface-2);
-            border: 1px solid var(--border);
-            border-radius: 6px;
-            padding: 0.4rem;
-            cursor: pointer;
-            color: var(--text-dim);
-            display: flex;
-            transition: color 0.2s;
-        }
-        .settings-btn:hover { color: var(--accent); }
-        .settings-btn svg { width: 18px; height: 18px; }
-
-        /* Settings panel */
-        .settings-overlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0,0,0,0.5);
-            z-index: 200;
-        }
-        .settings-overlay.open { display: flex; justify-content: flex-end; }
-        .settings-panel {
-            width: 300px;
-            max-width: 90vw;
-            background: var(--surface);
-            border-left: 1px solid var(--border);
-            padding: 1.5rem;
-            height: 100vh;
-            overflow-y: auto;
-        }
-        .settings-panel h3 { margin-bottom: 1rem; font-size: 1.1rem; }
-        .settings-group { margin-bottom: 1.5rem; }
-        .settings-group label { display: block; font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.4rem; }
-        .theme-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.5rem;
-        }
-        .theme-option {
-            padding: 0.5rem;
-            border: 2px solid var(--border);
-            border-radius: 6px;
-            cursor: pointer;
-            text-align: center;
-            font-size: 0.8rem;
-            transition: border-color 0.2s;
-        }
-        .theme-option.active { border-color: var(--accent); }
-        .theme-option:hover { border-color: var(--accent); }
-        .theme-swatch {
-            width: 100%; height: 20px;
-            border-radius: 3px;
-            margin-bottom: 0.3rem;
-        }
-
-        main { padding: 1.5rem; max-width: 1400px; margin: 0 auto; }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-        .stat-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem;
-            text-align: center;
-        }
-        .stat-value { font-size: 2rem; font-weight: 700; color: var(--accent); }
-        .stat-label { font-size: 0.75rem; color: var(--text-dim); margin-top: 0.2rem; }
-
-        .section-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
-
-        /* Topology — small, squared */
-        .topology-container {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            aspect-ratio: 2 / 1;
-            max-height: 200px;
-        }
-        .topology-container svg { width: 100%; height: 100%; }
-
-        .nodes-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-        .node-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            position: relative;
-            overflow: hidden;
-        }
-        .node-card:hover { border-color: var(--accent); box-shadow: 0 0 12px var(--accent-glow); }
-        .node-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--green); }
-        .node-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
-        .node-name { font-size: 1rem; font-weight: 600; }
-        .node-id { font-size: 0.65rem; color: var(--text-dim); font-family: monospace; }
-        .node-status { padding: 0.15rem 0.5rem; border-radius: 99px; font-size: 0.65rem; font-weight: 600; text-transform: uppercase; background: rgba(16,185,129,0.15); color: var(--green); }
-        .node-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; margin-bottom: 0.75rem; font-size: 0.8rem; }
-        .node-meta dt { color: var(--text-dim); }
-        .node-meta dd { color: var(--text); font-weight: 500; }
-        .model-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
-        .model-tag { background: var(--surface-2); border: 1px solid var(--border); padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-family: monospace; }
-
-        .empty-state { text-align: center; padding: 3rem 1.5rem; color: var(--text-dim); }
-        .empty-state h2 { font-size: 1.2rem; margin-bottom: 0.4rem; color: var(--text); }
-        .empty-state code { background: var(--surface-2); padding: 0.15rem 0.4rem; border-radius: 3px; font-size: 0.8rem; }
-
-        .refresh-indicator { font-size: 0.7rem; color: var(--text-dim); text-align: right; margin-bottom: 0.4rem; }
-
-        footer { text-align: center; padding: 1.5rem; color: var(--text-dim); font-size: 0.75rem; border-top: 1px solid var(--border); }
-
-        @media (max-width: 768px) {
-            header { padding: 0.5rem 1rem; }
-            main { padding: 1rem; }
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
-            .nodes-grid { grid-template-columns: 1fr; }
-            .stat-value { font-size: 1.5rem; }
-            .topology-container { max-height: 150px; }
-            .settings-panel { width: 260px; }
-        }
-        @media (max-width: 480px) {
-            .stats-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
-            .stat-card { padding: 0.75rem; }
-            .stat-value { font-size: 1.3rem; }
-            .version-badge { display: none; }
-        }
+        :root,[data-theme="dark"]{--bg:#0f1117;--surface:#1a1d27;--surface-2:#242836;--border:#2d3248;--text:#e4e7ec;--text-dim:#8b92a5;--accent:#6366f1;--accent-glow:rgba(99,102,241,0.3);--green:#10b981;--red:#ef4444;--yellow:#f59e0b;--radius:10px}
+        [data-theme="light"]{--bg:#f8f9fc;--surface:#fff;--surface-2:#f0f2f5;--border:#e2e5ea;--text:#1a1d27;--text-dim:#6b7280;--accent:#4f46e5;--accent-glow:rgba(79,70,229,0.15);--green:#059669;--red:#dc2626;--yellow:#d97706}
+        [data-theme="nord"]{--bg:#2e3440;--surface:#3b4252;--surface-2:#434c5e;--border:#4c566a;--text:#eceff4;--text-dim:#d8dee9;--accent:#88c0d0;--accent-glow:rgba(136,192,208,0.25);--green:#a3be8c;--red:#bf616a;--yellow:#ebcb8b}
+        [data-theme="dracula"]{--bg:#282a36;--surface:#44475a;--surface-2:#383a4a;--border:#6272a4;--text:#f8f8f2;--text-dim:#bd93f9;--accent:#ff79c6;--accent-glow:rgba(255,121,198,0.25);--green:#50fa7b;--red:#ff5555;--yellow:#f1fa8c}
+        [data-theme="catppuccin-latte"]{--bg:#eff1f5;--surface:#e6e9ef;--surface-2:#dce0e8;--border:#ccd0da;--text:#4c4f69;--text-dim:#6c6f85;--accent:#8839ef;--accent-glow:rgba(136,57,239,0.15);--green:#40a02b;--red:#d20f39;--yellow:#df8e1d}
+        [data-theme="catppuccin-frappe"]{--bg:#303446;--surface:#292c3c;--surface-2:#414559;--border:#51576d;--text:#c6d0f5;--text-dim:#a5adce;--accent:#ca9ee6;--accent-glow:rgba(202,158,230,0.25);--green:#a6d189;--red:#e78284;--yellow:#e5c890}
+        [data-theme="catppuccin-macchiato"]{--bg:#24273a;--surface:#1e2030;--surface-2:#363a4f;--border:#494d64;--text:#cad3f5;--text-dim:#a5adcb;--accent:#c6a0f6;--accent-glow:rgba(198,160,246,0.25);--green:#a6da95;--red:#ed8796;--yellow:#eed49f}
+        [data-theme="catppuccin-mocha"]{--bg:#1e1e2e;--surface:#181825;--surface-2:#313244;--border:#45475a;--text:#cdd6f4;--text-dim:#a6adc8;--accent:#cba6f7;--accent-glow:rgba(203,166,247,0.25);--green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af}
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
+        header{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+        .logo{display:flex;align-items:center;gap:.5rem;font-size:1.25rem;font-weight:700}
+        .logo svg{width:26px;height:26px}
+        .header-right{display:flex;align-items:center;gap:.75rem}
+        .version-badge{padding:.2rem .5rem;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;font-size:.7rem;font-family:monospace;color:var(--text-dim)}
+        .status-badge{display:flex;align-items:center;gap:.4rem;padding:.3rem .7rem;background:var(--surface-2);border-radius:99px;font-size:.8rem}
+        .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+        .pulse.offline{background:var(--red);animation:none}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+        .settings-btn{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;padding:.4rem;cursor:pointer;color:var(--text-dim);display:flex;transition:color .2s}
+        .settings-btn:hover{color:var(--accent)}
+        .settings-btn svg{width:18px;height:18px}
+        .settings-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200}
+        .settings-overlay.open{display:flex;justify-content:flex-end}
+        .settings-panel{width:320px;max-width:90vw;background:var(--surface);border-left:1px solid var(--border);padding:1.5rem;height:100vh;overflow-y:auto}
+        .settings-panel h3{margin-bottom:1rem;font-size:1.1rem}
+        .settings-group{margin-bottom:1.5rem}
+        .settings-group label{display:block;font-size:.8rem;color:var(--text-dim);margin-bottom:.4rem}
+        .theme-grid{display:grid;grid-template-columns:1fr 1fr;gap:.5rem}
+        .theme-option{padding:.4rem;border:2px solid var(--border);border-radius:6px;cursor:pointer;text-align:center;font-size:.7rem;transition:border-color .2s}
+        .theme-option.active{border-color:var(--accent)}
+        .theme-option:hover{border-color:var(--accent)}
+        .theme-swatch{width:100%;height:16px;border-radius:3px;margin-bottom:.2rem}
+        nav.tabs{display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid var(--border)}
+        nav.tabs button{background:none;border:none;color:var(--text-dim);padding:.6rem 1.2rem;font-size:.85rem;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .2s,border-color .2s}
+        nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent)}
+        nav.tabs button:hover{color:var(--text)}
+        .tab-content{display:none}
+        .tab-content.active{display:block}
+        main{padding:1.5rem;max-width:1400px;margin:0 auto}
+        .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.75rem;margin-bottom:1.5rem}
+        .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;text-align:center}
+        .stat-value{font-size:2rem;font-weight:700;color:var(--accent)}
+        .stat-label{font-size:.75rem;color:var(--text-dim);margin-top:.2rem}
+        .topology-container{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;display:flex;justify-content:center;align-items:center;min-height:320px}
+        .topology-container svg{width:100%;height:100%}
+        .nodes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:.75rem}
+        .node-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;transition:border-color .2s,box-shadow .2s;position:relative;overflow:hidden}
+        .node-card:hover{border-color:var(--accent);box-shadow:0 0 12px var(--accent-glow)}
+        .node-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--green)}
+        .node-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.75rem}
+        .node-name{font-size:1rem;font-weight:600}
+        .node-id{font-size:.65rem;color:var(--text-dim);font-family:monospace}
+        .node-status{padding:.15rem .5rem;border-radius:99px;font-size:.65rem;font-weight:600;text-transform:uppercase;background:rgba(16,185,129,.15);color:var(--green)}
+        .node-meta{display:grid;grid-template-columns:1fr 1fr;gap:.3rem;margin-bottom:.75rem;font-size:.8rem}
+        .node-meta dt{color:var(--text-dim)}
+        .node-meta dd{color:var(--text);font-weight:500}
+        .model-tags{display:flex;flex-wrap:wrap;gap:.3rem}
+        .model-tag{background:var(--surface-2);border:1px solid var(--border);padding:.15rem .5rem;border-radius:4px;font-size:.7rem;font-family:monospace}
+        .models-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.75rem}
+        .model-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;cursor:default;position:relative;transition:border-color .2s}
+        .model-card:hover{border-color:var(--accent)}
+        .model-card-name{font-size:.85rem;font-weight:600;font-family:monospace;margin-bottom:.3rem;word-break:break-all}
+        .model-card-count{font-size:.75rem;color:var(--text-dim)}
+        .model-card-engines{display:none;position:absolute;bottom:100%;left:0;right:0;background:var(--surface);border:1px solid var(--accent);border-radius:var(--radius);padding:.75rem;z-index:50;box-shadow:0 -4px 16px rgba(0,0,0,.3)}
+        .model-card:hover .model-card-engines{display:block}
+        .model-engine-item{font-size:.75rem;padding:.2rem 0;color:var(--text-dim);display:flex;justify-content:space-between}
+        .model-engine-item span:first-child{color:var(--text);font-weight:500}
+        .empty-state{text-align:center;padding:3rem 1.5rem;color:var(--text-dim)}
+        .empty-state h2{font-size:1.2rem;margin-bottom:.4rem;color:var(--text)}
+        .empty-state code{background:var(--surface-2);padding:.15rem .4rem;border-radius:3px;font-size:.8rem}
+        .refresh-indicator{font-size:.7rem;color:var(--text-dim);text-align:right;margin-bottom:.4rem}
+        footer{text-align:center;padding:1.5rem;color:var(--text-dim);font-size:.75rem;border-top:1px solid var(--border)}
+        @media(max-width:768px){header{padding:.5rem 1rem}main{padding:1rem}.stats-grid{grid-template-columns:repeat(2,1fr)}.nodes-grid,.models-grid{grid-template-columns:1fr}.stat-value{font-size:1.5rem}.settings-panel{width:280px}}
     </style>
 </head>
 <body>
-    <header>
-        <div class="logo">
-            <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2" opacity="0.3"/><circle cx="16" cy="16" r="4" fill="var(--accent)"/><circle cx="8" cy="8" r="2" fill="var(--green)"/><circle cx="24" cy="8" r="2" fill="var(--green)"/><circle cx="8" cy="24" r="2" fill="var(--green)"/><circle cx="24" cy="24" r="2" fill="var(--green)"/><line x1="16" y1="16" x2="8" y2="8" stroke="var(--accent)" stroke-width="1" opacity="0.5"/><line x1="16" y1="16" x2="24" y2="8" stroke="var(--accent)" stroke-width="1" opacity="0.5"/><line x1="16" y1="16" x2="8" y2="24" stroke="var(--accent)" stroke-width="1" opacity="0.5"/><line x1="16" y1="16" x2="24" y2="24" stroke="var(--accent)" stroke-width="1" opacity="0.5"/></svg>
-            Beagrid
-        </div>
-        <div class="header-right">
-            <nav style="display:flex;gap:0.5rem;margin-right:0.5rem;">
-                <a href="/" style="color:var(--accent);text-decoration:none;font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:4px;background:var(--surface-2);">Dashboard</a>
-                <a href="/stats.html" style="color:var(--text-dim);text-decoration:none;font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:4px;">Stats</a>
-            </nav>
-            <span class="version-badge" id="version-badge">...</span>
-            <div class="status-badge">
-                <span class="pulse" id="pulse-dot"></span>
-                <span id="connection-status">...</span>
-            </div>
-            <button class="settings-btn" onclick="toggleSettings()" title="Settings">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            </button>
-        </div>
-    </header>
+<header>
+    <div class="logo">
+        <svg viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="14" stroke="currentColor" stroke-width="2" opacity=".3"/><circle cx="16" cy="16" r="4" fill="var(--accent)"/><circle cx="8" cy="8" r="2" fill="var(--green)"/><circle cx="24" cy="8" r="2" fill="var(--green)"/><circle cx="8" cy="24" r="2" fill="var(--green)"/><circle cx="24" cy="24" r="2" fill="var(--green)"/><line x1="16" y1="16" x2="8" y2="8" stroke="var(--accent)" stroke-width="1" opacity=".5"/><line x1="16" y1="16" x2="24" y2="8" stroke="var(--accent)" stroke-width="1" opacity=".5"/><line x1="16" y1="16" x2="8" y2="24" stroke="var(--accent)" stroke-width="1" opacity=".5"/><line x1="16" y1="16" x2="24" y2="24" stroke="var(--accent)" stroke-width="1" opacity=".5"/></svg>
+        Beagrid
+    </div>
+    <div class="header-right">
+        <a href="/stats.html" style="color:var(--text-dim);text-decoration:none;font-size:.8rem;padding:.2rem .5rem;border-radius:4px;background:var(--surface-2);">Stats</a>
+        <span class="version-badge" id="version-badge">...</span>
+        <div class="status-badge"><span class="pulse" id="pulse-dot"></span><span id="connection-status">...</span></div>
+        <button class="settings-btn" onclick="openSettings()" title="Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68 1.65 1.65 0 0 0 10 3.17V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.32 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+    </div>
+</header>
 
-    <!-- Settings Panel -->
-    <div class="settings-overlay" id="settings-overlay" onclick="closeSettings(event)">
-        <div class="settings-panel" onclick="event.stopPropagation()">
-            <h3>⚙️ Settings</h3>
-            <div class="settings-group">
-                <label>Built-in Themes</label>
-                <div class="theme-grid">
-                    <div class="theme-option" data-theme="dark" onclick="setTheme('dark')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #0f1117, #1a1d27)"></div>
-                        Dark
-                    </div>
-                    <div class="theme-option" data-theme="light" onclick="setTheme('light')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #f8f9fc, #ffffff)"></div>
-                        Light
-                    </div>
-                    <div class="theme-option" data-theme="nord" onclick="setTheme('nord')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #2e3440, #88c0d0)"></div>
-                        Nord
-                    </div>
-                    <div class="theme-option" data-theme="dracula" onclick="setTheme('dracula')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #282a36, #ff79c6)"></div>
-                        Dracula
-                    </div>
-                    <div class="theme-option" data-theme="catppuccin-latte" onclick="setTheme('catppuccin-latte')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #eff1f5, #8839ef)"></div>
-                        Latte
-                    </div>
-                    <div class="theme-option" data-theme="catppuccin-frappe" onclick="setTheme('catppuccin-frappe')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #303446, #ca9ee6)"></div>
-                        Frappé
-                    </div>
-                    <div class="theme-option" data-theme="catppuccin-macchiato" onclick="setTheme('catppuccin-macchiato')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #24273a, #c6a0f6)"></div>
-                        Macchiato
-                    </div>
-                    <div class="theme-option" data-theme="catppuccin-mocha" onclick="setTheme('catppuccin-mocha')">
-                        <div class="theme-swatch" style="background: linear-gradient(135deg, #1e1e2e, #cba6f7)"></div>
-                        Mocha
-                    </div>
-                </div>
+<!-- Settings -->
+<div class="settings-overlay" id="settings-overlay" onclick="closeSettings(event)">
+    <div class="settings-panel" onclick="event.stopPropagation()">
+        <h3>⚙️ Settings</h3>
+        <div class="settings-group"><label>Built-in Themes</label>
+            <div class="theme-grid">
+                <div class="theme-option" data-theme="dark" onclick="setTheme('dark')"><div class="theme-swatch" style="background:linear-gradient(135deg,#0f1117,#6366f1)"></div>Dark</div>
+                <div class="theme-option" data-theme="light" onclick="setTheme('light')"><div class="theme-swatch" style="background:linear-gradient(135deg,#f8f9fc,#4f46e5)"></div>Light</div>
+                <div class="theme-option" data-theme="nord" onclick="setTheme('nord')"><div class="theme-swatch" style="background:linear-gradient(135deg,#2e3440,#88c0d0)"></div>Nord</div>
+                <div class="theme-option" data-theme="dracula" onclick="setTheme('dracula')"><div class="theme-swatch" style="background:linear-gradient(135deg,#282a36,#ff79c6)"></div>Dracula</div>
+                <div class="theme-option" data-theme="catppuccin-latte" onclick="setTheme('catppuccin-latte')"><div class="theme-swatch" style="background:linear-gradient(135deg,#eff1f5,#8839ef)"></div>Latte</div>
+                <div class="theme-option" data-theme="catppuccin-frappe" onclick="setTheme('catppuccin-frappe')"><div class="theme-swatch" style="background:linear-gradient(135deg,#303446,#ca9ee6)"></div>Frappé</div>
+                <div class="theme-option" data-theme="catppuccin-macchiato" onclick="setTheme('catppuccin-macchiato')"><div class="theme-swatch" style="background:linear-gradient(135deg,#24273a,#c6a0f6)"></div>Macchiato</div>
+                <div class="theme-option" data-theme="catppuccin-mocha" onclick="setTheme('catppuccin-mocha')"><div class="theme-swatch" style="background:linear-gradient(135deg,#1e1e2e,#cba6f7)"></div>Mocha</div>
             </div>
-            <div class="settings-group">
-                <label>Community Themes</label>
-                <div class="theme-grid" id="custom-themes-grid">
-                    <div style="grid-column:1/-1;color:var(--text-dim);font-size:0.75rem;text-align:center;">Loading...</div>
-                </div>
+        </div>
+        <div class="settings-group"><label>Community Themes</label><div class="theme-grid" id="custom-themes-grid"><div style="grid-column:1/-1;color:var(--text-dim);font-size:.7rem;text-align:center">Loading...</div></div></div>
+        <div class="settings-group"><label>Create Theme (live preview)</label>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem">
+                <input id="ct-name" placeholder="Theme name" style="grid-column:1/-1;padding:.35rem;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:.75rem">
+                <label style="font-size:.65rem">BG<input id="ct-bg" type="color" value="#0f1117" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
+                <label style="font-size:.65rem">Surface<input id="ct-surface" type="color" value="#1a1d27" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
+                <label style="font-size:.65rem">Accent<input id="ct-accent" type="color" value="#6366f1" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
+                <label style="font-size:.65rem">Text<input id="ct-text" type="color" value="#e4e7ec" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
+                <label style="font-size:.65rem">Border<input id="ct-border" type="color" value="#2d3248" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
+                <label style="font-size:.65rem">Green<input id="ct-green" type="color" value="#10b981" oninput="previewTheme()" style="width:100%;height:24px;border:none;cursor:pointer"></label>
             </div>
-            <div class="settings-group">
-                <label>Create Theme</label>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
-                    <input id="ct-name" placeholder="Theme name" style="grid-column:1/-1;padding:0.35rem;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.75rem;">
-                    <input id="ct-bg" type="color" value="#0f1117" title="Background">
-                    <input id="ct-surface" type="color" value="#1a1d27" title="Surface">
-                    <input id="ct-accent" type="color" value="#6366f1" title="Accent">
-                    <input id="ct-text" type="color" value="#e4e7ec" title="Text">
-                    <input id="ct-border" type="color" value="#2d3248" title="Border">
-                    <input id="ct-green" type="color" value="#10b981" title="Green">
-                </div>
-                <button onclick="createTheme()" style="margin-top:0.5rem;width:100%;padding:0.4rem;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Save Theme</button>
-                <div id="ct-msg" style="font-size:0.7rem;margin-top:0.3rem;color:var(--text-dim);"></div>
-            </div>
-            <div class="settings-group">
-                <label>Refresh interval</label>
-                <select id="refresh-interval" onchange="setRefreshInterval(this.value)" style="width:100%;padding:0.4rem;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;">
-                    <option value="3000">3s</option>
-                    <option value="5000" selected>5s</option>
-                    <option value="10000">10s</option>
-                    <option value="30000">30s</option>
-                </select>
-            </div>
+            <button onclick="createTheme()" style="margin-top:.5rem;width:100%;padding:.4rem;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;font-size:.8rem">Save Theme</button>
+            <div id="ct-msg" style="font-size:.7rem;margin-top:.3rem;color:var(--text-dim)"></div>
+        </div>
+        <div class="settings-group"><label>Refresh interval</label>
+            <select id="refresh-interval" onchange="setRefreshInterval(this.value)" style="width:100%;padding:.4rem;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px">
+                <option value="3000">3s</option><option value="5000" selected>5s</option><option value="10000">10s</option><option value="30000">30s</option>
+            </select>
         </div>
     </div>
+</div>
 
-    <main>
-        <div class="stats-grid">
-            <div class="stat-card"><div class="stat-value" id="stat-nodes">-</div><div class="stat-label">Engines</div></div>
-            <div class="stat-card"><div class="stat-value" id="stat-models">-</div><div class="stat-label">Models</div></div>
-            <div class="stat-card"><div class="stat-value" id="stat-tasks">-</div><div class="stat-label">Active Tasks</div></div>
-            <div class="stat-card"><div class="stat-value" id="stat-ttl">-</div><div class="stat-label">TTL</div></div>
-        </div>
+<main>
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-value" id="stat-nodes">-</div><div class="stat-label">Engines</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-models">-</div><div class="stat-label">Models</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-tasks">-</div><div class="stat-label">Active Tasks</div></div>
+        <div class="stat-card"><div class="stat-value" id="stat-ttl">-</div><div class="stat-label">TTL</div></div>
+    </div>
 
-        <div class="section-title">Grid Topology</div>
-        <div class="topology-container"><svg id="topo" viewBox="0 0 400 180"></svg></div>
+    <!-- Tabs -->
+    <nav class="tabs">
+        <button class="active" onclick="switchTab('engines')">Engines</button>
+        <button onclick="switchTab('topology')">Topology</button>
+        <button onclick="switchTab('models')">Models</button>
+    </nav>
 
+    <!-- Tab: Engines -->
+    <div class="tab-content active" id="tab-engines">
         <div class="refresh-indicator" id="refresh-indicator">—</div>
-        <div class="section-title">Connected Engines</div>
         <div class="nodes-grid" id="nodes-grid">
             <div class="empty-state"><h2>No engines connected</h2><p><code>beagrid join --at http://ollama:11434/v1 -m model</code></p></div>
         </div>
-    </main>
-    <footer>Beagrid — <span id="grid-name">home</span></footer>
+    </div>
 
-    <script>
-    const API = window.location.origin;
-    let interval = 5000;
-    let timer;
+    <!-- Tab: Topology -->
+    <div class="tab-content" id="tab-topology">
+        <div class="topology-container"><svg id="topo" viewBox="0 0 600 320"></svg></div>
+    </div>
 
-    // --- Theme ---
-    let customThemes = [];
+    <!-- Tab: Models -->
+    <div class="tab-content" id="tab-models">
+        <div class="models-grid" id="models-grid">
+            <div class="empty-state"><h2>No models available</h2></div>
+        </div>
+    </div>
+</main>
+<footer>Beagrid — <span id="grid-name">home</span></footer>
 
-    function setTheme(t) {
-        // Check if it's a custom theme (UUID)
-        const custom = customThemes.find(ct => ct.id === t);
-        if (custom) {
-            applyCustomTheme(custom);
-        } else {
-            document.documentElement.removeAttribute('style');
-            document.documentElement.setAttribute('data-theme', t);
-        }
-        localStorage.setItem('beagrid-theme', t);
-        document.querySelectorAll('.theme-option').forEach(el => el.classList.toggle('active', el.dataset.theme === t));
-    }
+<script>
+const API = window.location.origin;
+let interval = 5000, timer;
+let customThemes = [];
+let savedTheme = null; // for reverting on settings close
+let isPreviewing = false;
+let lastNodes = [];
 
-    function applyCustomTheme(t) {
-        document.documentElement.removeAttribute('data-theme');
-        const root = document.documentElement;
-        root.style.setProperty('--bg', t.bg);
-        root.style.setProperty('--surface', t.surface);
-        root.style.setProperty('--surface-2', t.surface2);
-        root.style.setProperty('--border', t.border);
-        root.style.setProperty('--text', t.text);
-        root.style.setProperty('--text-dim', t.text_dim);
-        root.style.setProperty('--accent', t.accent);
-        root.style.setProperty('--green', t.green);
-        root.style.setProperty('--red', t.red);
-        root.style.setProperty('--yellow', t.yellow);
-        root.style.setProperty('--radius', t.radius);
-    }
+// --- Tabs ---
+function switchTab(name) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('nav.tabs button').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-'+name).classList.add('active');
+    document.querySelector(`nav.tabs button[onclick="switchTab('${name}')"]`).classList.add('active');
+}
 
-    function loadTheme() {
-        const t = localStorage.getItem('beagrid-theme') || 'dark';
-        setTheme(t);
-    }
+// --- Theme ---
+function setTheme(t) {
+    isPreviewing = false;
+    const custom = customThemes.find(ct => ct.id === t);
+    if (custom) { applyVars(custom); } else { clearVars(); document.documentElement.setAttribute('data-theme', t); }
+    localStorage.setItem('beagrid-theme', t);
+    savedTheme = t;
+    document.querySelectorAll('.theme-option').forEach(el => el.classList.toggle('active', el.dataset.theme === t));
+}
+function applyVars(t) {
+    document.documentElement.removeAttribute('data-theme');
+    const r = document.documentElement.style;
+    r.setProperty('--bg',t.bg); r.setProperty('--surface',t.surface); r.setProperty('--surface-2',t.surface2||t.surface);
+    r.setProperty('--border',t.border); r.setProperty('--text',t.text); r.setProperty('--text-dim',t.text_dim||t.text);
+    r.setProperty('--accent',t.accent); r.setProperty('--green',t.green||'#10b981');
+    r.setProperty('--red',t.red||'#ef4444'); r.setProperty('--yellow',t.yellow||'#f59e0b');
+}
+function clearVars() {
+    const r = document.documentElement.style;
+    ['--bg','--surface','--surface-2','--border','--text','--text-dim','--accent','--green','--red','--yellow','--radius'].forEach(v=>r.removeProperty(v));
+}
+function loadTheme() { savedTheme = localStorage.getItem('beagrid-theme') || 'dark'; setTheme(savedTheme); }
 
-    async function loadCustomThemes() {
-        try {
-            const res = await fetch(`${API}/api/themes`);
-            if (!res.ok) { renderCustomThemes([]); return; }
-            customThemes = await res.json();
-            renderCustomThemes(customThemes);
-            // Re-apply if current theme is custom
-            const current = localStorage.getItem('beagrid-theme');
-            const match = customThemes.find(t => t.id === current);
-            if (match) applyCustomTheme(match);
-        } catch { renderCustomThemes([]); }
-    }
+function previewTheme() {
+    isPreviewing = true;
+    const r = document.documentElement.style;
+    document.documentElement.removeAttribute('data-theme');
+    r.setProperty('--bg', document.getElementById('ct-bg').value);
+    r.setProperty('--surface', document.getElementById('ct-surface').value);
+    r.setProperty('--surface-2', document.getElementById('ct-surface').value);
+    r.setProperty('--border', document.getElementById('ct-border').value);
+    r.setProperty('--text', document.getElementById('ct-text').value);
+    r.setProperty('--text-dim', document.getElementById('ct-text').value+'99');
+    r.setProperty('--accent', document.getElementById('ct-accent').value);
+    r.setProperty('--green', document.getElementById('ct-green').value);
+}
+function revertPreview() { if (isPreviewing) { isPreviewing = false; setTheme(savedTheme); } }
 
-    function renderCustomThemes(themes) {
-        const grid = document.getElementById('custom-themes-grid');
-        if (!themes.length) {
-            grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-dim);font-size:0.7rem;text-align:center;">No community themes yet</div>';
-            return;
-        }
-        grid.innerHTML = themes.map(t => `
-            <div class="theme-option" data-theme="${t.id}" onclick="setTheme('${t.id}')">
-                <div class="theme-swatch" style="background: linear-gradient(135deg, ${t.bg}, ${t.accent})"></div>
-                ${esc(t.name)}
-            </div>
-        `).join('');
-    }
+// --- Settings ---
+function openSettings() { savedTheme = localStorage.getItem('beagrid-theme') || 'dark'; document.getElementById('settings-overlay').classList.add('open'); }
+function closeSettings(e) {
+    if (e.target !== e.currentTarget) return;
+    document.getElementById('settings-overlay').classList.remove('open');
+    revertPreview();
+}
+function setRefreshInterval(ms) { interval=parseInt(ms); localStorage.setItem('beagrid-refresh',ms); clearInterval(timer); timer=setInterval(fetchAll,interval); }
 
-    async function createTheme() {
-        const msg = document.getElementById('ct-msg');
-        const name = document.getElementById('ct-name').value.trim();
-        if (!name) { msg.textContent = 'Name required'; return; }
+// --- Custom themes ---
+async function loadCustomThemes() {
+    try { const r=await fetch(`${API}/api/themes`); if(!r.ok){renderCustomThemes([]);return;} customThemes=await r.json(); renderCustomThemes(customThemes); const c=localStorage.getItem('beagrid-theme'); const m=customThemes.find(t=>t.id===c); if(m)applyVars(m); } catch{renderCustomThemes([]);}
+}
+function renderCustomThemes(themes) {
+    const g=document.getElementById('custom-themes-grid');
+    if(!themes||!themes.length){g.innerHTML='<div style="grid-column:1/-1;color:var(--text-dim);font-size:.7rem;text-align:center">No community themes</div>';return;}
+    g.innerHTML=themes.map(t=>`<div class="theme-option" data-theme="${t.id}" onclick="setTheme('${t.id}')"><div class="theme-swatch" style="background:linear-gradient(135deg,${t.bg},${t.accent})"></div>${esc(t.name)}</div>`).join('');
+}
+async function createTheme() {
+    const msg=document.getElementById('ct-msg'), name=document.getElementById('ct-name').value.trim();
+    if(!name){msg.textContent='Name required';return;}
+    const token=localStorage.getItem('beagrid-token'), headers={'Content-Type':'application/json'};
+    if(token)headers['Authorization']=`Bearer ${token}`;
+    const body={name,bg:document.getElementById('ct-bg').value,surface:document.getElementById('ct-surface').value,surface2:document.getElementById('ct-surface').value,accent:document.getElementById('ct-accent').value,text:document.getElementById('ct-text').value,border:document.getElementById('ct-border').value,green:document.getElementById('ct-green').value};
+    try{const r=await fetch(`${API}/api/themes`,{method:'POST',headers,body:JSON.stringify(body)});const d=await r.json();if(!r.ok){msg.textContent=d.error||'Failed';return;}msg.textContent='✓ Saved!';document.getElementById('ct-name').value='';isPreviewing=false;loadCustomThemes();setTheme(d.id);}catch(e){msg.textContent='Error: '+e.message;}
+}
 
-        const token = localStorage.getItem('beagrid-token');
-        const headers = {'Content-Type': 'application/json'};
-        if (token) headers['Authorization'] = `Bearer ${token}`;
+// --- Data ---
+async function fetchAll() {
+    try {
+        const [info,disc,ver]=await Promise.all([fetch(`${API}/grid/info`).then(r=>r.json()),fetch(`${API}/nodes/discover`).then(r=>r.json()),fetch(`${API}/version`).then(r=>r.json())]);
+        lastNodes=disc.engines||[];
+        updateVersion(ver); updateStats(info,lastNodes); updateTopology(lastNodes); updateNodes(lastNodes); updateModels(lastNodes);
+        document.getElementById('grid-name').textContent=info.name||'home';
+        setConnected(true);
+        document.getElementById('refresh-indicator').textContent=`Updated ${new Date().toLocaleTimeString()}`;
+    } catch{setConnected(false);}
+}
+function setConnected(ok){document.getElementById('connection-status').textContent=ok?'Online':'Offline';document.getElementById('pulse-dot').className=ok?'pulse':'pulse offline';}
+function updateVersion(v){document.getElementById('version-badge').textContent=v.version||'dev';}
+function updateStats(info,nodes){
+    document.getElementById('stat-nodes').textContent=info.engines_online||0;
+    const models=new Set(); let tasks=0;
+    nodes.forEach(n=>{(n.models||[]).forEach(m=>models.add(m));tasks+=n.load?.active_tasks||0;});
+    document.getElementById('stat-models').textContent=models.size;
+    document.getElementById('stat-tasks').textContent=tasks;
+    document.getElementById('stat-ttl').textContent=(info.node_ttl_seconds||60)+'s';
+}
+function updateTopology(nodes){
+    const svg=document.getElementById('topo');
+    if(!nodes.length){svg.innerHTML='<text x="300" y="160" text-anchor="middle" fill="var(--text-dim)" font-size="14">No engines</text>';return;}
+    const cx=300,cy=160,r=120; let h='';
+    nodes.forEach((n,i)=>{
+        const a=(2*Math.PI*i/nodes.length)-Math.PI/2, nx=cx+r*Math.cos(a), ny=cy+r*Math.sin(a);
+        h+=`<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="4,4"/>`;
+        h+=`<rect x="${nx-30}" y="${ny-18}" width="60" height="36" rx="5" fill="var(--surface-2)" stroke="var(--green)" stroke-width="1.5"/>`;
+        h+=`<text x="${nx}" y="${ny-3}" text-anchor="middle" fill="var(--text)" font-size="9" font-weight="600">${esc((n.name||'node').slice(0,9))}</text>`;
+        h+=`<text x="${nx}" y="${ny+10}" text-anchor="middle" fill="var(--text-dim)" font-size="7">${(n.models||[]).length} model${(n.models||[]).length!==1?'s':''}</text>`;
+    });
+    h+=`<rect x="${cx-32}" y="${cy-20}" width="64" height="40" rx="8" fill="var(--accent)" opacity=".9"/>`;
+    h+=`<text x="${cx}" y="${cy-3}" text-anchor="middle" fill="white" font-size="10" font-weight="700">BEAGRID</text>`;
+    h+=`<text x="${cx}" y="${cy+11}" text-anchor="middle" fill="white" font-size="8" opacity=".8">SERVER</text>`;
+    svg.innerHTML=h;
+}
+function updateNodes(nodes){
+    const g=document.getElementById('nodes-grid');
+    if(!nodes.length){g.innerHTML='<div class="empty-state"><h2>No engines</h2><p><code>beagrid join --at URL -m model</code></p></div>';return;}
+    g.innerHTML=nodes.map(n=>`<div class="node-card"><div class="node-header"><div><div class="node-name">${esc(n.name||n.node_id)}</div><div class="node-id">${n.node_id||''}</div></div><span class="node-status">online</span></div><dl class="node-meta"><dt>Role</dt><dd>${n.role||'engine'}</dd><dt>Seen</dt><dd>${timeAgo(n.last_heartbeat)}</dd><dt>Tasks</dt><dd>${n.load?.active_tasks||0}</dd><dt>Endpoint</dt><dd style="font-size:.65rem;word-break:break-all">${esc(n.endpoint_url||'-')}</dd></dl><div class="model-tags">${(n.models||[]).map(m=>`<span class="model-tag">${esc(m)}</span>`).join('')}</div></div>`).join('');
+}
+function updateModels(nodes){
+    const g=document.getElementById('models-grid');
+    const modelEngines={}; // model → [{name, endpoint, tasks}]
+    nodes.forEach(n=>(n.models||[]).forEach(m=>{
+        if(!modelEngines[m])modelEngines[m]=[];
+        modelEngines[m].push({name:n.name||n.node_id,endpoint:n.endpoint_url||'-',tasks:n.load?.active_tasks||0});
+    }));
+    const models=Object.keys(modelEngines).sort();
+    if(!models.length){g.innerHTML='<div class="empty-state"><h2>No models</h2></div>';return;}
+    g.innerHTML=models.map(m=>{
+        const engines=modelEngines[m];
+        return `<div class="model-card"><div class="model-card-name">${esc(m)}</div><div class="model-card-count">${engines.length} engine${engines.length>1?'s':''}</div><div class="model-card-engines"><div style="font-size:.7rem;font-weight:600;margin-bottom:.3rem;color:var(--accent)">Served by:</div>${engines.map(e=>`<div class="model-engine-item"><span>${esc(e.name)}</span><span>${e.tasks} tasks</span></div>`).join('')}</div></div>`;
+    }).join('');
+}
+function timeAgo(ts){if(!ts)return'-';const d=(Date.now()-new Date(ts).getTime())/1000;return d<60?Math.round(d)+'s':d<3600?Math.round(d/60)+'m':Math.round(d/3600)+'h';}
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
 
-        const body = {
-            name,
-            bg: document.getElementById('ct-bg').value,
-            surface: document.getElementById('ct-surface').value,
-            surface2: document.getElementById('ct-surface').value,
-            accent: document.getElementById('ct-accent').value,
-            text: document.getElementById('ct-text').value,
-            border: document.getElementById('ct-border').value,
-            green: document.getElementById('ct-green').value,
-        };
-
-        try {
-            const res = await fetch(`${API}/api/themes`, { method:'POST', headers, body: JSON.stringify(body) });
-            const data = await res.json();
-            if (!res.ok) { msg.textContent = data.error || 'Failed'; return; }
-            msg.textContent = '✓ Theme created!';
-            document.getElementById('ct-name').value = '';
-            loadCustomThemes();
-            setTheme(data.id);
-        } catch(e) { msg.textContent = 'Error: ' + e.message; }
-    }
-
-    // --- Settings ---
-    function toggleSettings() { document.getElementById('settings-overlay').classList.toggle('open'); }
-    function closeSettings(e) { if (e.target === e.currentTarget) toggleSettings(); }
-    function setRefreshInterval(ms) {
-        interval = parseInt(ms);
-        localStorage.setItem('beagrid-refresh', ms);
-        clearInterval(timer);
-        timer = setInterval(fetchAll, interval);
-    }
-
-    // --- Data ---
-    async function fetchAll() {
-        try {
-            const [info, disc, ver] = await Promise.all([
-                fetch(`${API}/grid/info`).then(r=>r.json()),
-                fetch(`${API}/nodes/discover`).then(r=>r.json()),
-                fetch(`${API}/version`).then(r=>r.json()),
-            ]);
-            const nodes = disc.engines || [];
-            updateVersion(ver);
-            updateStats(info, nodes);
-            updateTopology(nodes);
-            updateNodes(nodes);
-            document.getElementById('grid-name').textContent = info.name || 'home';
-            setConnected(true);
-            document.getElementById('refresh-indicator').textContent = `Updated ${new Date().toLocaleTimeString()}`;
-        } catch { setConnected(false); }
-    }
-
-    function setConnected(ok) {
-        document.getElementById('connection-status').textContent = ok ? 'Online' : 'Offline';
-        document.getElementById('pulse-dot').className = ok ? 'pulse' : 'pulse offline';
-    }
-    function updateVersion(v) { document.getElementById('version-badge').textContent = v.version || 'dev'; }
-    function updateStats(info, nodes) {
-        document.getElementById('stat-nodes').textContent = info.engines_online || 0;
-        const models = new Set();
-        let tasks = 0;
-        nodes.forEach(n => { (n.models||[]).forEach(m => models.add(m)); tasks += n.load?.active_tasks || 0; });
-        document.getElementById('stat-models').textContent = models.size;
-        document.getElementById('stat-tasks').textContent = tasks;
-        document.getElementById('stat-ttl').textContent = (info.node_ttl_seconds||60)+'s';
-    }
-
-    function updateTopology(nodes) {
-        const svg = document.getElementById('topo');
-        if (!nodes.length) { svg.innerHTML = '<text x="200" y="90" text-anchor="middle" fill="var(--text-dim)" font-size="12">No engines</text>'; return; }
-        const cx=200, cy=90, r=65;
-        let h = '';
-        nodes.forEach((n,i) => {
-            const a = (2*Math.PI*i/nodes.length) - Math.PI/2;
-            const nx = cx + r*Math.cos(a), ny = cy + r*Math.sin(a);
-            h += `<line x1="${cx}" y1="${cy}" x2="${nx}" y2="${ny}" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="3,3"/>`;
-            h += `<rect x="${nx-22}" y="${ny-14}" width="44" height="28" rx="4" fill="var(--surface-2)" stroke="var(--green)" stroke-width="1.5"/>`;
-            h += `<text x="${nx}" y="${ny-2}" text-anchor="middle" fill="var(--text)" font-size="7" font-weight="600">${esc((n.name||'node').slice(0,7))}</text>`;
-            h += `<text x="${nx}" y="${ny+8}" text-anchor="middle" fill="var(--text-dim)" font-size="6">${(n.models||[]).length}m</text>`;
-        });
-        h += `<rect x="${cx-24}" y="${cy-16}" width="48" height="32" rx="6" fill="var(--accent)" opacity="0.9"/>`;
-        h += `<text x="${cx}" y="${cy-2}" text-anchor="middle" fill="white" font-size="7" font-weight="700">BEAGRID</text>`;
-        h += `<text x="${cx}" y="${cy+8}" text-anchor="middle" fill="white" font-size="6" opacity="0.8">SERVER</text>`;
-        svg.innerHTML = h;
-    }
-
-    function updateNodes(nodes) {
-        const g = document.getElementById('nodes-grid');
-        if (!nodes.length) { g.innerHTML = '<div class="empty-state"><h2>No engines</h2><p><code>beagrid join --at URL -m model</code></p></div>'; return; }
-        g.innerHTML = nodes.map(n => `
-        <div class="node-card">
-            <div class="node-header">
-                <div><div class="node-name">${esc(n.name||n.node_id)}</div><div class="node-id">${n.node_id||''}</div></div>
-                <span class="node-status">online</span>
-            </div>
-            <dl class="node-meta">
-                <dt>Role</dt><dd>${n.role||'engine'}</dd>
-                <dt>Seen</dt><dd>${timeAgo(n.last_heartbeat)}</dd>
-                <dt>Tasks</dt><dd>${n.load?.active_tasks||0}</dd>
-                <dt>Endpoint</dt><dd style="font-size:0.65rem;word-break:break-all">${esc(n.endpoint_url||'-')}</dd>
-            </dl>
-            <div class="model-tags">${(n.models||[]).map(m=>`<span class="model-tag">${esc(m)}</span>`).join('')}</div>
-        </div>`).join('');
-    }
-
-    function timeAgo(ts) { if(!ts)return'-'; const d=(Date.now()-new Date(ts).getTime())/1000; return d<60?Math.round(d)+'s':d<3600?Math.round(d/60)+'m':Math.round(d/3600)+'h'; }
-    function esc(s) { const d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
-
-    // Init
-    loadTheme();
-    loadCustomThemes();
-    const savedInterval = localStorage.getItem('beagrid-refresh');
-    if (savedInterval) { interval = parseInt(savedInterval); document.getElementById('refresh-interval').value = savedInterval; }
-    fetchAll();
-    timer = setInterval(fetchAll, interval);
-    </script>
+// Init
+loadTheme(); loadCustomThemes();
+const si=localStorage.getItem('beagrid-refresh');if(si){interval=parseInt(si);document.getElementById('refresh-interval').value=si;}
+fetchAll(); timer=setInterval(fetchAll,interval);
+</script>
 </body>
 </html>
