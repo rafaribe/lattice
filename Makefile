@@ -1,17 +1,20 @@
-.PHONY: all build server agent clean test docker-server docker-agent lint
+.PHONY: all build server agent cli clean test docker-server docker-agent lint
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
 all: build
 
-build: server agent
+build: server agent cli
 
 server:
 	go build $(LDFLAGS) -o bin/beagrid-server ./cmd/server
 
 agent:
 	go build $(LDFLAGS) -o bin/beagrid-agent ./cmd/agent
+
+cli:
+	go build $(LDFLAGS) -o bin/beagrid ./cmd/beagrid
 
 clean:
 	rm -rf bin/
@@ -31,7 +34,7 @@ docker-agent:
 docker: docker-server docker-agent
 
 run-server:
-	go run ./cmd/server --port 8080
+	go run ./cmd/server --port 8090
 
 run-agent:
-	go run ./cmd/agent --server http://localhost:8080 --ollama http://localhost:11434
+	go run ./cmd/agent --server http://localhost:8090 --ollama http://localhost:11434

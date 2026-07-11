@@ -7,11 +7,17 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/rafaribe/beagrid/internal/domain"
 )
 
-// OllamaAdapter implements the OllamaClient port to talk to a local Ollama instance.
+// OllamaModel is a model from the Ollama /api/tags response.
+type OllamaModel struct {
+	Name       string `json:"name"`
+	Size       int64  `json:"size"`
+	Digest     string `json:"digest"`
+	ModifiedAt string `json:"modified_at"`
+}
+
+// OllamaAdapter talks to a local Ollama instance.
 type OllamaAdapter struct {
 	baseURL string
 	client  *http.Client
@@ -24,24 +30,11 @@ func NewOllamaAdapter(baseURL string) *OllamaAdapter {
 	}
 }
 
-// ollamaTagsResponse mirrors Ollama's /api/tags response.
-type ollamaTagsResponse struct {
-	Models []ollamaModel `json:"models"`
-}
-
-type ollamaModel struct {
-	Name       string `json:"name"`
-	Size       int64  `json:"size"`
-	Digest     string `json:"digest"`
-	ModifiedAt string `json:"modified_at"`
-}
-
-func (o *OllamaAdapter) ListModels(ctx context.Context) ([]domain.Model, error) {
+func (o *OllamaAdapter) ListModels(ctx context.Context) ([]OllamaModel, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.baseURL+"/api/tags", nil)
 	if err != nil {
 		return nil, err
 	}
-
 	resp, err := o.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("contacting ollama at %s: %w", o.baseURL, err)
@@ -52,21 +45,13 @@ func (o *OllamaAdapter) ListModels(ctx context.Context) ([]domain.Model, error) 
 		return nil, fmt.Errorf("ollama returned %d", resp.StatusCode)
 	}
 
-	var tags ollamaTagsResponse
-	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+	var result struct {
+		Models []OllamaModel `json:"models"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding ollama response: %w", err)
 	}
-
-	models := make([]domain.Model, 0, len(tags.Models))
-	for _, m := range tags.Models {
-		models = append(models, domain.Model{
-			Name:       m.Name,
-			Size:       m.Size,
-			Digest:     m.Digest,
-			ModifiedAt: m.ModifiedAt,
-		})
-	}
-	return models, nil
+	return result.Models, nil
 }
 
 func (o *OllamaAdapter) IsHealthy(ctx context.Context) bool {

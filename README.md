@@ -1,142 +1,179 @@
 # ⚡ Beagrid
 
-**A free, open-source inference grid that pools your Ollama nodes behind one endpoint.**
+**A free, open-source inference grid that pools your Ollama/vLLM/LM Studio/MLX/llama.cpp nodes behind one endpoint.**
 
-Beagrid connects multiple machines running [Ollama](https://ollama.com) into a unified inference grid. A central server (designed for Kubernetes) accepts OpenAI-compatible requests and routes them to the best available node using a priority-based algorithm. Agents on each machine discover local Ollama instances and advertise their models to the grid.
+Beagrid connects machines running inference engines into a unified grid. A central server (designed for Kubernetes) accepts OpenAI-compatible requests and routes them to the least-loaded available engine. Agents auto-detect local inference servers and register them with the grid.
 
-No accounts. No paid features. Just your hardware, connected.
+No accounts. No paid features. No relay services. Just your hardware, connected.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Beagrid Server (K8s)                │
-│                                                       │
-│  ┌─────────┐  ┌──────────┐  ┌────────────────────┐  │
-│  │ Web UI  │  │ Registry │  │ Priority Router    │  │
-│  └─────────┘  └──────────┘  └────────────────────┘  │
-│                      ▲                                │
-│          /v1/chat/completions                         │
-└──────────────┬──────────────────┬────────────────────┘
-               │                  │
-        ┌──────▼──────┐    ┌──────▼──────┐
-        │  Agent #1   │    │  Agent #2   │
-        │  (daemon)   │    │  (daemon)   │
-        ├─────────────┤    ├─────────────┤
-        │ Ollama      │    │ Ollama      │
-        │ llama3.2    │    │ mistral     │
-        │ codellama   │    │ qwen2.5     │
-        └─────────────┘    └─────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                  Beagrid Server (K8s)                        │
+│                                                              │
+│  ┌────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
+│  │ Web UI │  │ Registry │  │ Router   │  │ OpenAI API  │  │
+│  │  /ui/  │  │ /nodes/* │  │ (load)   │  │ /v1/*       │  │
+│  └────────┘  └──────────┘  └──────────┘  └─────────────┘  │
+│                                                              │
+│  Endpoints: / /grid/info /nodes/discover /v1/models         │
+│             /v1/chat/completions /v1/completions             │
+│             /v1/media/image/generate /v1/media/video/i2v    │
+└──────────────────┬──────────────────┬────────────────────────┘
+                   │                  │
+        ┌──────────▼──────┐   ┌───────▼──────────┐
+        │   Agent #1      │   │   Agent #2       │
+        │   auto-detect:  │   │   --at vllm      │
+        │   ollama:11434  │   │   --at mlx:8080  │
+        ├─────────────────┤   ├──────────────────┤
+        │ Ollama          │   │ vLLM / MLX       │
+        │ llama3.2, qwen  │   │ mistral, gemma   │
+        └─────────────────┘   └──────────────────┘
 ```
 
-## Features
+## Features (autonomous-grid parity)
 
-- **OpenAI-compatible endpoint** — drop-in replacement for any tool that speaks the OpenAI chat API
-- **Priority-based routing** — weighted algorithm considering priority, active load, error rate, and latency
-- **Auto-discovery** — agents automatically discover and advertise models from local Ollama instances
-- **Heartbeat + auto-recovery** — nodes marked offline after missed heartbeats, agents re-register automatically
-- **Web dashboard** — real-time grid topology, node status, and model availability
-- **Kubernetes-native** — Deployment for the server, DaemonSet for agents, all manifests included
-- **Streaming support** — full SSE streaming passthrough for chat completions
-- **Zero dependencies** — single static Go binaries for both server and agent
+| Feature | Status |
+|---------|--------|
+| OpenAI-compatible `/v1/chat/completions` | ✅ |
+| OpenAI-compatible `/v1/completions` | ✅ |
+| `/v1/models` listing | ✅ |
+| `/nodes/discover` engine discovery | ✅ |
+| `/grid/info` endpoint | ✅ |
+| Node TTL-based reaping | ✅ |
+| Load-based routing (active_tasks) | ✅ |
+| Model aliasing (`--advertise-as` / upstream) | ✅ |
+| Roles: engine, app, both | ✅ |
+| PUT /nodes/{id} auto-create | ✅ |
+| Multi-engine auto-detection (Ollama, vLLM, LM Studio, MLX, llama.cpp, ComfyUI) | ✅ |
+| Media endpoints (image/generate, image/edit, video/i2v) | ✅ |
+| Proper OpenAI error format | ✅ |
+| Streaming support (SSE passthrough) | ✅ |
+| CLI: `up`, `down`, `ls`, `info`, `use`, `join`, `leave`, `models`, `engines`, `chat`, `version` | ✅ |
+| Web dashboard with topology visualization | ✅ |
+| Kubernetes manifests (server + agent DaemonSet) | ✅ |
+| Heartbeat + auto-re-registration | ✅ |
+| Single static Go binaries (zero runtime dependencies) | ✅ |
+| Docker images (multi-stage, <20MB) | ✅ |
 
 ## Quickstart
 
-### Binary
+### Build
 
 ```bash
-# Build
 make build
-
-# Run the server
-./bin/beagrid-server --port 8080
-
-# On each Ollama machine, run the agent
-./bin/beagrid-agent --server http://your-server:8080 --ollama http://localhost:11434 --name my-gpu-node --priority 1
+# Produces: bin/beagrid-server, bin/beagrid-agent, bin/beagrid
 ```
 
-### Docker
+### Run Server
 
 ```bash
-# Build images
-make docker
-
-# Run server
-docker run -p 8080:8080 beagrid-server:dev
-
-# Run agent (on Ollama machines)
-docker run --network host beagrid-agent:dev \
-  --server http://your-server:8080 \
-  --ollama http://localhost:11434
+./bin/beagrid-server --port 8090 --name home
 ```
 
-### Kubernetes
+### Join Engines
 
 ```bash
-# Deploy server
-kubectl apply -f deploy/k8s/server.yaml
+# Auto-detect all running inference engines on this machine
+./bin/beagrid-agent --server http://your-server:8090 --all
 
-# Label nodes running Ollama
-kubectl label node gpu-node-1 beagrid.io/ollama=true
+# Or join a specific Ollama
+./bin/beagrid-agent --server http://your-server:8090 --ollama http://localhost:11434
 
-# Deploy agent DaemonSet
-kubectl apply -f deploy/k8s/agent.yaml
+# Or use the CLI
+./bin/beagrid join --at http://localhost:11434/v1 -m llama3.2:latest --name my-gpu
 ```
 
-## Usage
-
-Once agents have joined, send requests to the server's OpenAI-compatible endpoint:
+### Use the Grid
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "llama3.2:latest",
-    "messages": [{"role": "user", "content": "Hello from the grid!"}]
-  }'
+# List models
+./bin/beagrid models --verbose
+
+# Chat
+./bin/beagrid chat -m llama3.2:latest "hello from the grid"
+
+# Info
+./bin/beagrid info --env
+# export OPENAI_BASE_URL="http://192.168.1.10:8090/v1"
+# export OPENAI_API_KEY="local-grid"
 ```
 
-Point any OpenAI-compatible tool at the grid:
+### Point Any App at the Grid
 
-```bash
-export OPENAI_BASE_URL="http://beagrid-server:8080/v1"
-export OPENAI_API_KEY="not-needed"
+```python
+from openai import OpenAI
+client = OpenAI(base_url="http://beagrid:8090/v1", api_key="local-grid")
+client.chat.completions.create(
+    model="llama3.2:latest",
+    messages=[{"role": "user", "content": "hello"}],
+)
 ```
 
-## API
+## API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/chat/completions` | POST | OpenAI-compatible inference (routes to best node) |
-| `/api/v1/nodes` | GET | List all registered nodes |
-| `/api/v1/nodes/{id}` | GET | Get a specific node |
-| `/api/v1/nodes/register` | POST | Register a new node |
-| `/api/v1/nodes/heartbeat` | POST | Send node heartbeat |
-| `/api/v1/nodes/{id}` | DELETE | Remove a node |
-| `/api/v1/grid/info` | GET | Grid statistics |
+| `/` | GET | Grid info (same as `/grid/info`) |
+| `/grid/info` | GET | Grid metadata: id, name, type, engines_online, ttl |
+| `/nodes` | POST | Create a node slot |
+| `/nodes/{node_id}` | PUT | Register/update an engine (auto-creates if needed) |
+| `/nodes/heartbeat` | POST | Refresh node TTL and update load |
+| `/nodes/{node_id}` | DELETE | Unregister a node |
+| `/nodes/discover` | GET | List active engines (optional `?model=` filter) |
+| `/v1/models` | GET | OpenAI-compatible model listing |
+| `/v1/chat/completions` | POST | Proxy to best engine (stream supported) |
+| `/v1/completions` | POST | Proxy to best engine |
+| `/v1/media/image/generate` | POST | Proxy to ComfyUI media engine |
+| `/v1/media/image/edit` | POST | Proxy to ComfyUI media engine |
+| `/v1/media/video/i2v` | POST | Proxy to ComfyUI media engine |
 | `/healthz` | GET | Health check |
+| `/ui/` | GET | Web dashboard |
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `beagrid up [name]` | Bring a grid online |
+| `beagrid down [name]` | Take a grid offline |
+| `beagrid ls` | List grids |
+| `beagrid info [--env] [--json]` | Show grid info or export env vars |
+| `beagrid use <name>` | Set the active grid |
+| `beagrid join [grid] --at <url> -m <model>` | Join an engine to the grid |
+| `beagrid join [grid] --all` | Join all detected local engines |
+| `beagrid leave [grid]` | Leave and unregister |
+| `beagrid models [--verbose] [--json]` | List live models |
+| `beagrid engines [--json]` | List live engines |
+| `beagrid chat -m <model> <message>` | Send a chat message |
+| `beagrid version` | Print version |
 
 ## Routing Algorithm
 
-The priority router scores each candidate node using:
+Engines are sorted by `active_tasks` (ascending), then by freshness of heartbeat. The first match wins — routing to the engine with the least current load that serves the requested model.
 
-| Factor | Weight | Description |
-|--------|--------|-------------|
-| Priority | 40% | Configurable per-node (lower = better) |
-| Active Load | 30% | Current concurrent requests |
-| Error Rate | 20% | Historical error percentage |
-| Latency | 10% | Average response time |
+When a model is advertised under an alias (`--advertise-as`), the proxy rewrites the model name to the engine's real name before forwarding, using the `upstream` map.
 
-Lowest score wins.
+## Engine Auto-Detection
 
-## Web UI
+The agent probes well-known local ports in priority order:
 
-Access the dashboard at `http://your-server:8080/`. It shows:
+| Engine | Port | Detection |
+|--------|------|-----------|
+| Ollama | 11434 | GET /api/tags |
+| LM Studio | 1234 | GET /v1/models |
+| vLLM | 8000 | GET /v1/models |
+| MLX | 8080 | GET /v1/models |
+| llama.cpp | 8081 | GET /v1/models |
+| ComfyUI | 8188 | GET /system_stats |
 
-- Grid topology visualization with live connection lines
-- Node cards with status, priority, models, and request stats
-- Real-time stats (online nodes, unique models, total requests)
-- Auto-refreshes every 5 seconds
+## Kubernetes Deployment
+
+```bash
+kubectl apply -f deploy/k8s/server.yaml
+kubectl label node gpu-node-1 beagrid.io/ollama=true
+kubectl apply -f deploy/k8s/agent.yaml
+```
 
 ## Configuration
 
@@ -144,36 +181,22 @@ Access the dashboard at `http://your-server:8080/`. It shows:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--port` | 8080 | Listen port |
-| `--heartbeat-timeout` | 30s | Duration before marking a node offline |
+| `--port` | 8090 | Listen port |
+| `--host` | 0.0.0.0 | Listen host |
+| `--name` | home | Grid name |
+| `--grid-id` | auto | Grid ID |
+| `--node-ttl` | 60 | Seconds before node is reaped |
 
 ### Agent
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--server` | http://localhost:8080 | Beagrid server URL |
+| `--server` | http://localhost:8090 | Grid server URL |
 | `--ollama` | http://localhost:11434 | Local Ollama URL |
-| `--name` | hostname | Node display name |
-| `--priority` | 10 | Routing priority (lower = preferred) |
-
-## Project Structure
-
-```
-beagrid/
-├── cmd/
-│   ├── server/          # Server binary + embedded web UI
-│   └── agent/           # Agent binary
-├── internal/
-│   ├── domain/          # Core types and port interfaces
-│   ├── server/          # Registry, router, HTTP handlers
-│   ├── agent/           # Daemon, Ollama adapter
-│   └── proxy/           # Inference proxy to Ollama
-├── deploy/
-│   ├── k8s/             # Kubernetes manifests
-│   ├── Dockerfile.server
-│   └── Dockerfile.agent
-└── Makefile
-```
+| `--at` | | External engine URL |
+| `--all` | false | Detect all local engines |
+| `--name` | hostname | Engine display name |
+| `--heartbeat-interval` | 15.0 | Heartbeat seconds |
 
 ## License
 

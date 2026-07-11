@@ -1,221 +1,362 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"sync/atomic"
+	"strings"
+	"time"
 
 	"github.com/rafaribe/beagrid/internal/domain"
 )
 
-// Handler aggregates all HTTP endpoints for the beagrid server.
+// Handler provides all HTTP endpoints for the beagrid server.
 type Handler struct {
-	registry domain.NodeRegistry
-	router   domain.Router
-	proxy    domain.InferenceProxy
+	registry *Registry
 	logger   *slog.Logger
-	requests atomic.Int64
+	client   *http.Client
 }
 
-func NewHandler(registry domain.NodeRegistry, router domain.Router, proxy domain.InferenceProxy, logger *slog.Logger) *Handler {
+func NewHandler(registry *Registry, logger *slog.Logger) *Handler {
 	return &Handler{
 		registry: registry,
-		router:   router,
-		proxy:    proxy,
 		logger:   logger,
+		client:   &http.Client{Timeout: 600 * time.Second},
 	}
 }
 
-// RegisterRoutes wires all API routes.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Node management
-	mux.HandleFunc("POST /api/v1/nodes/register", h.handleRegister)
-	mux.HandleFunc("POST /api/v1/nodes/heartbeat", h.handleHeartbeat)
-	mux.HandleFunc("DELETE /api/v1/nodes/{id}", h.handleDeregister)
-	mux.HandleFunc("GET /api/v1/nodes", h.handleListNodes)
-	mux.HandleFunc("GET /api/v1/nodes/{id}", h.handleGetNode)
-
 	// Grid info
-	mux.HandleFunc("GET /api/v1/grid/info", h.handleGridInfo)
+	mux.HandleFunc("GET /grid/info", h.handleGridInfo)
 
-	// OpenAI-compatible inference endpoint
-	mux.HandleFunc("POST /v1/chat/completions", h.handleInference)
+	// Node lifecycle (matches autonomous-grid exactly)
+	mux.HandleFunc("POST /nodes", h.handleCreateNode)
+	mux.HandleFunc("PUT /nodes/{node_id}", h.handleUpdateNode)
+	mux.HandleFunc("POST /nodes/heartbeat", h.handleHeartbeat)
+	mux.HandleFunc("DELETE /nodes/{node_id}", h.handleDeleteNode)
+	mux.HandleFunc("GET /nodes/discover", h.handleDiscover)
+
+	// OpenAI-compatible endpoints
+	mux.HandleFunc("GET /v1/models", h.handleModels)
+	mux.HandleFunc("POST /v1/chat/completions", h.handleChatCompletions)
+	mux.HandleFunc("POST /v1/completions", h.handleCompletions)
+
+	// Media placeholder endpoints
+	mux.HandleFunc("POST /v1/media/image/generate", h.handleMediaProxy)
+	mux.HandleFunc("POST /v1/media/image/edit", h.handleMediaProxy)
+	mux.HandleFunc("POST /v1/media/video/i2v", h.handleMediaProxy)
 
 	// Health
 	mux.HandleFunc("GET /healthz", h.handleHealth)
+
+	// Legacy aliases for our own API consumers
+	mux.HandleFunc("GET /api/v1/nodes", h.handleDiscoverLegacy)
+	mux.HandleFunc("GET /api/v1/grid/info", h.handleGridInfo)
 }
 
-func (h *Handler) handleRegister(w http.ResponseWriter, r *http.Request) {
-	var req domain.RegisterRequest
+// --- Grid Info ---
+
+func (h *Handler) handleGridInfo(w http.ResponseWriter, _ *http.Request) {
+	h.json(w, h.registry.Info(), http.StatusOK)
+}
+
+// --- Node Lifecycle ---
+
+func (h *Handler) handleCreateNode(w http.ResponseWriter, r *http.Request) {
+	var req domain.NodeCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.jsonError(w, "invalid request body", http.StatusBadRequest)
+		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
 		return
 	}
-
-	resp, err := h.registry.Register(r.Context(), req)
+	resp, err := h.registry.Create(r.Context(), req)
 	if err != nil {
-		h.jsonError(w, err.Error(), http.StatusInternalServerError)
+		h.openaiError(w, 500, err.Error(), "internal_error")
+		return
+	}
+	h.logger.Info("node created", "node_id", resp.NodeID, "role", resp.Role)
+	h.json(w, resp, http.StatusOK)
+}
+
+func (h *Handler) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("node_id")
+	var req domain.NodeUpdateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
 		return
 	}
 
-	h.logger.Info("node registered", "node_id", resp.NodeID, "name", req.Name, "models", len(req.Models))
-	h.jsonResponse(w, resp, http.StatusCreated)
+	if (req.Role == domain.RoleEngine || req.Role == domain.RoleBoth) && len(req.Models) == 0 {
+		h.openaiError(w, 400, "at least one model is required for engines", "invalid_request")
+		return
+	}
+
+	textModels := []string{}
+	for _, m := range req.Models {
+		if !strings.HasPrefix(m, "comfyui:") {
+			textModels = append(textModels, m)
+		}
+	}
+	if len(textModels) > 0 && req.EndpointURL == "" {
+		h.openaiError(w, 400, "endpoint_url is required for text engines", "invalid_request")
+		return
+	}
+
+	node, err := h.registry.Update(r.Context(), nodeID, req)
+	if err != nil {
+		h.openaiError(w, 500, err.Error(), "internal_error")
+		return
+	}
+	h.logger.Info("node updated", "node_id", nodeID, "models", node.Models)
+	h.json(w, map[string]any{"status": "updated", "node": node}, http.StatusOK)
 }
 
 func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 	var req domain.HeartbeatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.jsonError(w, "invalid request body", http.StatusBadRequest)
+		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
 		return
 	}
-
 	if err := h.registry.Heartbeat(r.Context(), req); err != nil {
-		h.jsonError(w, err.Error(), http.StatusNotFound)
+		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
-
-	w.WriteHeader(http.StatusNoContent)
+	h.json(w, map[string]any{"ttl_seconds": h.registry.ttl}, http.StatusOK)
 }
 
-func (h *Handler) handleDeregister(w http.ResponseWriter, r *http.Request) {
-	nodeID := r.PathValue("id")
-	if err := h.registry.Deregister(r.Context(), nodeID); err != nil {
-		h.jsonError(w, err.Error(), http.StatusNotFound)
+func (h *Handler) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.PathValue("node_id")
+	if err := h.registry.Delete(r.Context(), nodeID); err != nil {
+		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
-	h.logger.Info("node deregistered", "node_id", nodeID)
-	w.WriteHeader(http.StatusNoContent)
+	h.logger.Info("node unregistered", "node_id", nodeID)
+	h.json(w, map[string]string{"status": "unregistered"}, http.StatusOK)
 }
 
-func (h *Handler) handleListNodes(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.registry.ListNodes(r.Context())
-	if err != nil {
-		h.jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	h.jsonResponse(w, nodes, http.StatusOK)
+func (h *Handler) handleDiscover(w http.ResponseWriter, r *http.Request) {
+	model := r.URL.Query().Get("model")
+	engines, _ := h.registry.Discover(r.Context(), model)
+	h.json(w, map[string]any{"engines": engines}, http.StatusOK)
 }
 
-func (h *Handler) handleGetNode(w http.ResponseWriter, r *http.Request) {
-	nodeID := r.PathValue("id")
-	node, err := h.registry.GetNode(r.Context(), nodeID)
-	if err != nil {
-		h.jsonError(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	h.jsonResponse(w, node, http.StatusOK)
+func (h *Handler) handleDiscoverLegacy(w http.ResponseWriter, r *http.Request) {
+	engines, _ := h.registry.Discover(r.Context(), "")
+	h.json(w, engines, http.StatusOK)
 }
 
-func (h *Handler) handleGridInfo(w http.ResponseWriter, r *http.Request) {
-	nodes, err := h.registry.ListNodes(r.Context())
-	if err != nil {
-		h.jsonError(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
+// --- OpenAI Endpoints ---
 
-	modelSet := make(map[string]struct{})
-	online := 0
-	for _, n := range nodes {
-		if n.Status == domain.StatusOnline {
-			online++
-		}
-		for _, m := range n.Models {
-			modelSet[m.Name] = struct{}{}
+func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
+	engines, _ := h.registry.Discover(r.Context(), "")
+	seen := map[string]struct{}{}
+	data := []domain.OpenAIModel{}
+	created := time.Now().Unix()
+
+	for _, engine := range engines {
+		for _, model := range engine.Models {
+			if _, ok := seen[model]; ok {
+				continue
+			}
+			seen[model] = struct{}{}
+			data = append(data, domain.OpenAIModel{
+				ID:      model,
+				Object:  "model",
+				Created: created,
+				OwnedBy: "lan",
+			})
 		}
 	}
-
-	models := make([]string, 0, len(modelSet))
-	for m := range modelSet {
-		models = append(models, m)
-	}
-
-	info := domain.GridInfo{
-		TotalNodes:    len(nodes),
-		OnlineNodes:   online,
-		TotalModels:   len(modelSet),
-		UniqueModels:  models,
-		TotalRequests: h.requests.Load(),
-	}
-	h.jsonResponse(w, info, http.StatusOK)
+	h.json(w, domain.OpenAIModelList{Object: "list", Data: data}, http.StatusOK)
 }
 
-func (h *Handler) handleInference(w http.ResponseWriter, r *http.Request) {
-	bodyBytes, err := io.ReadAll(r.Body)
-	if err != nil {
-		h.jsonError(w, "failed to read body", http.StatusBadRequest)
-		return
-	}
-
-	var req domain.InferenceRequest
-	if err := json.Unmarshal(bodyBytes, &req); err != nil {
-		h.jsonError(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	decision, err := h.router.Route(r.Context(), req.Model)
-	if err != nil {
-		h.jsonError(w, fmt.Sprintf("routing failed: %s", err), http.StatusServiceUnavailable)
-		return
-	}
-
-	h.requests.Add(1)
-	h.logger.Info("routing request", "model", req.Model, "target", decision.TargetNode.Name, "reason", decision.Reason)
-
-	if req.Stream {
-		h.streamInference(w, r.Context(), decision.TargetNode, &req)
-		return
-	}
-
-	respBytes, err := h.proxy.Forward(r.Context(), decision.TargetNode, &req)
-	if err != nil {
-		h.jsonError(w, fmt.Sprintf("inference failed: %s", err), http.StatusBadGateway)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(respBytes)
+func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
+	h.proxyOpenAI(w, r, "chat/completions")
 }
 
-func (h *Handler) streamInference(w http.ResponseWriter, ctx context.Context, node *domain.Node, req *domain.InferenceRequest) {
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		h.jsonError(w, "streaming not supported", http.StatusInternalServerError)
+func (h *Handler) handleCompletions(w http.ResponseWriter, r *http.Request) {
+	h.proxyOpenAI(w, r, "completions")
+}
+
+func (h *Handler) proxyOpenAI(w http.ResponseWriter, r *http.Request, endpointPath string) {
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.openaiError(w, 400, "Failed to read request body", "invalid_request")
 		return
 	}
 
-	w.Header().Set("Content-Type", "text/event-stream")
+	var body map[string]any
+	if err := json.Unmarshal(rawBody, &body); err != nil {
+		h.openaiError(w, 400, "Request body is not valid JSON", "invalid_json")
+		return
+	}
+
+	model, _ := body["model"].(string)
+	if model == "" {
+		h.openaiError(w, 400, "model is required", "invalid_request")
+		return
+	}
+
+	engines, _ := h.registry.Discover(r.Context(), model)
+	if len(engines) == 0 {
+		h.openaiError(w, 503, "No active local engine for model "+model, "engine_unavailable")
+		return
+	}
+
+	target := engines[0]
+	h.logger.Info("routing", "model", model, "target", target.Name, "node_id", target.NodeID, "load", target.Load.ActiveTasks)
+
+	// Rewrite model alias → upstream real name if needed
+	if upstream, ok := target.Upstream[model]; ok && upstream != model {
+		body["model"] = upstream
+		rawBody, _ = json.Marshal(body)
+	}
+
+	url := trimSlash(target.EndpointURL) + "/" + endpointPath
+	stream, _ := body["stream"].(bool)
+
+	proxyReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, strings.NewReader(string(rawBody)))
+	if err != nil {
+		h.openaiError(w, 502, "Failed to create proxy request: "+err.Error(), "engine_error")
+		return
+	}
+	proxyReq.Header.Set("Content-Type", "application/json")
+
+	if stream {
+		h.proxyStream(w, proxyReq, target)
+	} else {
+		h.proxyDirect(w, proxyReq, target)
+	}
+}
+
+func (h *Handler) proxyDirect(w http.ResponseWriter, proxyReq *http.Request, target *domain.Node) {
+	resp, err := h.client.Do(proxyReq)
+	if err != nil {
+		h.openaiError(w, 502, "Engine request failed: "+err.Error(), "engine_error")
+		return
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "application/json"
+	}
+	w.Header().Set("Content-Type", ct)
+	w.WriteHeader(resp.StatusCode)
+	w.Write(respBody)
+}
+
+func (h *Handler) proxyStream(w http.ResponseWriter, proxyReq *http.Request, target *domain.Node) {
+	transport := &http.Transport{}
+	streamClient := &http.Client{Transport: transport, Timeout: 0}
+	resp, err := streamClient.Do(proxyReq)
+	if err != nil {
+		h.openaiError(w, 502, "Engine stream request failed: "+err.Error(), "engine_error")
+		return
+	}
+	defer resp.Body.Close()
+
+	ct := resp.Header.Get("Content-Type")
+	if ct == "" {
+		ct = "text/event-stream"
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(resp.StatusCode)
 
-	err := h.proxy.ForwardStream(ctx, node, req, func(chunk []byte) {
-		w.Write(chunk)
-		flusher.Flush()
-	})
-	if err != nil {
-		h.logger.Error("stream error", "err", err)
+	flusher, _ := w.(http.Flusher)
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := resp.Body.Read(buf)
+		if n > 0 {
+			w.Write(buf[:n])
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+		if readErr != nil {
+			break
+		}
 	}
 }
 
-func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"status":"ok"}`))
+// --- Media Proxy ---
+
+func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
+	rawBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		h.openaiError(w, 400, "Failed to read request body", "invalid_request")
+		return
+	}
+
+	// Determine media model from endpoint path
+	path := r.URL.Path
+	var model string
+	switch {
+	case strings.Contains(path, "image/generate"):
+		model = "comfyui:image_generation"
+	case strings.Contains(path, "image/edit"):
+		model = "comfyui:image_editing"
+	case strings.Contains(path, "video/i2v"):
+		model = "comfyui:i2v"
+	default:
+		h.openaiError(w, 400, "Unknown media endpoint", "invalid_request")
+		return
+	}
+
+	engines, _ := h.registry.Discover(r.Context(), model)
+	if len(engines) == 0 {
+		h.openaiError(w, 503, "No active local media engine for "+model, "engine_unavailable")
+		return
+	}
+	target := engines[0]
+	if target.MediaURL == "" {
+		h.openaiError(w, 503, "Engine did not advertise a media URL", "engine_unavailable")
+		return
+	}
+
+	// Strip /v1/ prefix for media proxy
+	endpointPath := strings.TrimPrefix(path, "/v1/")
+	url := trimSlash(target.MediaURL) + "/" + endpointPath
+
+	proxyReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, strings.NewReader(string(rawBody)))
+	if err != nil {
+		h.openaiError(w, 502, "Failed to create media proxy request: "+err.Error(), "engine_error")
+		return
+	}
+	proxyReq.Header.Set("Content-Type", r.Header.Get("Content-Type"))
+	h.proxyStream(w, proxyReq, target)
 }
 
-func (h *Handler) jsonResponse(w http.ResponseWriter, data any, status int) {
+// --- Health ---
+
+func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	h.json(w, map[string]string{"status": "ok"}, http.StatusOK)
+}
+
+// --- Helpers ---
+
+func (h *Handler) json(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
 }
 
-func (h *Handler) jsonError(w http.ResponseWriter, msg string, status int) {
+func (h *Handler) openaiError(w http.ResponseWriter, status int, message, code string) {
+	errType := "invalid_request_error"
+	if status >= 500 {
+		errType = "server_error"
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]string{"error": msg})
+	json.NewEncoder(w).Encode(domain.OpenAIError{
+		Error: domain.OpenAIErrorBody{
+			Message: message,
+			Type:    errType,
+			Param:   nil,
+			Code:    code,
+		},
+	})
 }

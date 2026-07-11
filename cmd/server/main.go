@@ -8,9 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/rafaribe/beagrid/internal/proxy"
 	"github.com/rafaribe/beagrid/internal/server"
 )
 
@@ -20,8 +18,11 @@ var webFS embed.FS
 var version = "dev"
 
 func main() {
-	port := flag.Int("port", 8080, "Server listen port")
-	heartbeatTimeout := flag.Duration("heartbeat-timeout", 30*time.Second, "Duration before marking a node offline")
+	port := flag.Int("port", 8090, "Server listen port")
+	host := flag.String("host", "0.0.0.0", "Server listen host")
+	gridName := flag.String("name", "home", "Grid name")
+	gridID := flag.String("grid-id", "", "Grid ID (auto-generated if empty)")
+	nodeTTL := flag.Int("node-ttl", 60, "Seconds before a node is considered stale")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -32,27 +33,39 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
-	registry := server.NewMemoryRegistry(*heartbeatTimeout)
-	router := server.NewPriorityRouter(registry)
-	ollamaProxy := proxy.NewOllamaProxy()
-	handler := server.NewHandler(registry, router, ollamaProxy, logger)
+	gid := *gridID
+	if gid == "" {
+		gid = fmt.Sprintf("bg-%s-%s", *gridName, "local")
+	}
+
+	registry := server.NewRegistry(gid, *gridName, *nodeTTL)
+	handler := server.NewHandler(registry, logger)
 
 	mux := http.NewServeMux()
+
+	// Root serves grid info (like autonomous-grid)
+	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		handler.RegisterRoutes(mux)
+	})
+
 	handler.RegisterRoutes(mux)
 
-	// Serve embedded web UI
+	// Serve embedded web UI at /ui/
 	webContent, err := fs.Sub(webFS, "web")
 	if err != nil {
 		logger.Error("failed to load web assets", "err", err)
 		os.Exit(1)
 	}
-	mux.Handle("GET /", http.FileServer(http.FS(webContent)))
+	mux.Handle("GET /ui/", http.StripPrefix("/ui/", http.FileServer(http.FS(webContent))))
+	mux.Handle("GET /ui", http.RedirectHandler("/ui/", http.StatusMovedPermanently))
 
-	// CORS middleware for the UI
 	wrapped := corsMiddleware(mux)
 
-	addr := fmt.Sprintf(":%d", *port)
-	logger.Info("beagrid server starting", "addr", addr, "version", version)
+	addr := fmt.Sprintf("%s:%d", *host, *port)
+	logger.Info("beagrid server starting",
+		"addr", addr, "grid_id", gid, "grid_name", *gridName,
+		"node_ttl", *nodeTTL, "version", version,
+	)
 	if err := http.ListenAndServe(addr, wrapped); err != nil {
 		logger.Error("server failed", "err", err)
 		os.Exit(1)

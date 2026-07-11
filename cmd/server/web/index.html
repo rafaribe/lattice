@@ -264,11 +264,11 @@
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-total">-</div>
-                <div class="stat-label">Total Nodes</div>
+                <div class="stat-label">Total Engines</div>
             </div>
             <div class="stat-card">
                 <div class="stat-value" id="stat-requests">-</div>
-                <div class="stat-label">Total Requests</div>
+                <div class="stat-label">Node TTL</div>
             </div>
         </div>
 
@@ -293,14 +293,15 @@
 
         async function fetchData() {
             try {
-                const [infoRes, nodesRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/v1/grid/info`),
-                    fetch(`${API_BASE}/api/v1/nodes`)
+                const [infoRes, discoverRes] = await Promise.all([
+                    fetch(`${API_BASE}/grid/info`),
+                    fetch(`${API_BASE}/nodes/discover`)
                 ]);
                 const info = await infoRes.json();
-                const nodes = await nodesRes.json();
+                const discover = await discoverRes.json();
+                const nodes = discover.engines || [];
 
-                updateStats(info);
+                updateStats(info, nodes);
                 updateNodes(nodes);
                 updateTopology(nodes);
                 document.getElementById('connection-status').textContent = 'Connected';
@@ -309,39 +310,44 @@
             }
         }
 
-        function updateStats(info) {
-            document.getElementById('stat-nodes').textContent = info.online_nodes;
-            document.getElementById('stat-models').textContent = info.total_models;
-            document.getElementById('stat-total').textContent = info.total_nodes;
-            document.getElementById('stat-requests').textContent = info.total_requests;
+        function updateStats(info, nodes) {
+            document.getElementById('stat-nodes').textContent = info.engines_online || 0;
+            const models = new Set();
+            nodes.forEach(n => (n.models || []).forEach(m => models.add(m)));
+            document.getElementById('stat-models').textContent = models.size;
+            document.getElementById('stat-total').textContent = nodes.length;
+            document.getElementById('stat-requests').textContent = info.node_ttl_seconds + 's TTL';
         }
 
         function updateNodes(nodes) {
             const grid = document.getElementById('nodes-grid');
             if (!nodes || nodes.length === 0) {
-                grid.innerHTML = `<div class="empty-state"><h2>No nodes connected</h2><p>Start an agent to join the grid</p></div>`;
+                grid.innerHTML = `<div class="empty-state"><h2>No engines connected</h2><p>Run: <code>beagrid join --at http://your-ollama:11434/v1 -m llama3.2:latest</code></p></div>`;
                 return;
             }
-            grid.innerHTML = nodes.map(node => `
-                <div class="node-card ${node.status}">
+            grid.innerHTML = nodes.map(node => {
+                const status = 'online';
+                const name = node.name || node.node_id || '?';
+                return `
+                <div class="node-card ${status}">
                     <div class="node-header">
                         <div>
-                            <div class="node-name">${escHtml(node.name)}</div>
-                            <div class="node-id">${node.id}</div>
+                            <div class="node-name">${escHtml(name)}</div>
+                            <div class="node-id">${node.node_id || ''}</div>
                         </div>
-                        <span class="node-status ${node.status}">${node.status}</span>
+                        <span class="node-status ${status}">${status}</span>
                     </div>
                     <dl class="node-meta">
-                        <dt>Priority</dt><dd>${node.priority}</dd>
-                        <dt>Last Seen</dt><dd>${timeAgo(node.last_seen)}</dd>
-                        <dt>Requests</dt><dd>${node.stats?.total_requests || 0}</dd>
-                        <dt>Active</dt><dd>${node.stats?.active_requests || 0}</dd>
+                        <dt>Role</dt><dd>${node.role || 'engine'}</dd>
+                        <dt>Last Seen</dt><dd>${timeAgo(node.last_heartbeat)}</dd>
+                        <dt>Active Tasks</dt><dd>${node.load?.active_tasks || 0}</dd>
+                        <dt>Endpoint</dt><dd style="font-size:0.7rem;word-break:break-all">${escHtml(node.endpoint_url || node.media_url || '-')}</dd>
                     </dl>
                     <div class="model-tags">
-                        ${(node.models || []).map(m => `<span class="model-tag">${escHtml(m.name)}</span>`).join('')}
+                        ${(node.models || []).map(m => `<span class="model-tag">${escHtml(m)}</span>`).join('')}
                     </div>
                 </div>
-            `).join('');
+            `}).join('');
         }
 
         function updateTopology(nodes) {
