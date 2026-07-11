@@ -5,7 +5,7 @@
 #   docker compose --profile local up      # server + local ollama + agent → local ollama
 #   docker compose --profile gpu up        # server + local ollama (GPU) + agent → local ollama
 #
-# The server UI is at http://localhost:8090/ui/
+# The server UI is at http://localhost:8099/ui/
 
 services:
   # Beagrid server — the central grid endpoint
@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.server
     ports:
-      - "8090:8090"
+      - "8099:8090"
     command:
       - --port=8090
       - --name=home

@@ -12,6 +12,7 @@ import (
 	// Adapters (wired here in the composition root)
 	httpAdapter "github.com/rafaribe/beagrid/internal/adapters/inbound/http"
 	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/metrics"
 	"github.com/rafaribe/beagrid/internal/adapters/outbound/registry"
 )
 
@@ -43,28 +44,39 @@ func main() {
 
 	// --- Composition Root: wire adapters into ports ---
 
+	// Metrics (OTEL → Prometheus)
+	m, metricsHandler, err := metrics.New()
+	if err != nil {
+		logger.Error("failed to initialize metrics", "err", err)
+		os.Exit(1)
+	}
+
 	// Outbound adapters
 	reg := registry.New(gid, *gridName, *nodeTTL)
 	proxy := engine.NewProxy(logger)
 
-	// Inbound adapter (HTTP handler consumes outbound ports)
-	handler := httpAdapter.NewHandler(reg, proxy, logger, version)
+	// Inbound adapter (HTTP handler consumes outbound ports + metrics)
+	handler := httpAdapter.NewHandler(reg, proxy, m, logger, version)
 
 	// --- HTTP Mux ---
 	mux := http.NewServeMux()
+
+	// API routes (must be registered BEFORE the catch-all UI handler)
 	handler.RegisterRoutes(mux)
 
-	// Serve embedded web UI at /ui/
+	// Metrics endpoint (Prometheus format)
+	mux.Handle("GET /metrics", metricsHandler)
+
+	// Serve embedded web UI at / (catch-all for non-API paths)
 	webContent, err := fs.Sub(webFS, "web")
 	if err != nil {
 		logger.Error("failed to load web assets", "err", err)
 		os.Exit(1)
 	}
-	mux.Handle("GET /ui/", http.StripPrefix("/ui/", http.FileServer(http.FS(webContent))))
-	mux.Handle("GET /ui", http.RedirectHandler("/ui/", http.StatusMovedPermanently))
+	mux.Handle("GET /", http.FileServer(http.FS(webContent)))
 
-	// Middleware chain: CORS → Request ID → Mux
-	wrapped := corsMiddleware(httpAdapter.RequestIDMiddleware(mux))
+	// Middleware chain: CORS → Metrics → Request ID → Mux
+	wrapped := corsMiddleware(handler.MetricsMiddleware(httpAdapter.RequestIDMiddleware(mux)))
 
 	addr := fmt.Sprintf("%s:%d", *host, *port)
 	logger.Info("beagrid server starting",

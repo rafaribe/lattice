@@ -2,6 +2,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -10,8 +11,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/metrics"
 	"github.com/rafaribe/beagrid/internal/application"
 	"github.com/rafaribe/beagrid/internal/domain"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 const (
@@ -20,20 +24,21 @@ const (
 )
 
 // Handler provides all HTTP endpoints for the beagrid server.
-// It is an inbound adapter that translates HTTP requests into application port calls.
 type Handler struct {
 	registry application.NodeRegistry
 	proxy    application.EngineProxy
+	metrics  *metrics.Metrics
 	logger   *slog.Logger
 	version  string
 	startAt  time.Time
 }
 
 // NewHandler creates a new HTTP inbound adapter.
-func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy, logger *slog.Logger, version string) *Handler {
+func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy, m *metrics.Metrics, logger *slog.Logger, version string) *Handler {
 	return &Handler{
 		registry: registry,
 		proxy:    proxy,
+		metrics:  m,
 		logger:   logger,
 		version:  version,
 		startAt:  time.Now(),
@@ -42,9 +47,6 @@ func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy
 
 // RegisterRoutes wires all HTTP routes to the handler methods.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Root → grid info (like autonomous-grid)
-	mux.HandleFunc("GET /{$}", h.handleGridInfo)
-
 	// Grid info
 	mux.HandleFunc("GET /grid/info", h.handleGridInfo)
 
@@ -79,7 +81,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 // --- Middleware ---
 
-// RequestIDMiddleware adds a unique request ID to each request for tracing.
+// RequestIDMiddleware adds a unique request ID to each request.
 func RequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := r.Header.Get("X-Request-ID")
@@ -91,11 +93,24 @@ func RequestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// MetricsMiddleware records request count and duration for all requests.
+func (h *Handler) MetricsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next.ServeHTTP(w, r)
+		duration := time.Since(start).Seconds()
+
+		ctx := context.Background()
+		attrs := metric.WithAttributes(attribute.String("method", r.Method))
+		h.metrics.RequestsTotal.Add(ctx, 1, attrs)
+		h.metrics.RequestDuration.Record(ctx, duration, attrs)
+	})
+}
+
 // --- Grid Info ---
 
 func (h *Handler) handleGridInfo(w http.ResponseWriter, _ *http.Request) {
-	info := h.registry.Info()
-	h.writeJSON(w, info, http.StatusOK)
+	h.writeJSON(w, h.registry.Info(), http.StatusOK)
 }
 
 // --- Version ---
@@ -122,6 +137,7 @@ func (h *Handler) handleCreateNode(w http.ResponseWriter, r *http.Request) {
 		h.openaiError(w, 500, err.Error(), "internal_error")
 		return
 	}
+	h.metrics.ActiveEngines.Add(r.Context(), 1)
 	h.logger.Info("node created", "node_id", resp.NodeID, "role", resp.Role)
 	h.writeJSON(w, resp, http.StatusCreated)
 }
@@ -182,6 +198,7 @@ func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
+	h.metrics.HeartbeatsTotal.Add(r.Context(), 1)
 	h.writeJSON(w, map[string]any{
 		"node_id":     req.NodeID,
 		"ttl_seconds": h.registry.TTL(),
@@ -198,6 +215,7 @@ func (h *Handler) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
 		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
+	h.metrics.ActiveEngines.Add(r.Context(), -1)
 	h.logger.Info("node unregistered", "node_id", nodeID)
 	h.writeJSON(w, map[string]string{"status": "unregistered", "node_id": nodeID}, http.StatusOK)
 }
@@ -241,6 +259,10 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+
+	// Update gauge
+	h.metrics.ModelsAvailable.Record(r.Context(), int64(len(data)))
+
 	h.writeJSON(w, domain.OpenAIModelList{Object: "list", Data: data}, http.StatusOK)
 }
 
@@ -275,12 +297,14 @@ func (h *Handler) proxyOpenAI(w http.ResponseWriter, r *http.Request, endpointPa
 
 	engines, _ := h.registry.Discover(r.Context(), model)
 	if len(engines) == 0 {
+		h.metrics.ProxyErrors.Add(r.Context(), 1, metric.WithAttributes(attribute.String("reason", "no_engine")))
 		h.openaiError(w, 503, "No active local engine for model "+model, "engine_unavailable")
 		return
 	}
 
 	target := engines[0]
 	h.logger.Info("routing", "model", model, "target", target.Name, "node_id", target.NodeID, "load", target.Load.ActiveTasks)
+	h.metrics.ProxyRequests.Add(r.Context(), 1, metric.WithAttributes(attribute.String("model", model)))
 
 	// Rewrite model alias → upstream real name if needed
 	if upstream, ok := target.Upstream[model]; ok && upstream != model {
@@ -319,6 +343,7 @@ func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 
 	engines, _ := h.registry.Discover(r.Context(), model)
 	if len(engines) == 0 {
+		h.metrics.ProxyErrors.Add(r.Context(), 1, metric.WithAttributes(attribute.String("reason", "no_media_engine")))
 		h.openaiError(w, 503, "No active local media engine for "+model, "engine_unavailable")
 		return
 	}
@@ -329,6 +354,7 @@ func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 	}
 
 	endpointPath := strings.TrimPrefix(path, "/v1/")
+	h.metrics.ProxyRequests.Add(r.Context(), 1, metric.WithAttributes(attribute.String("model", model)))
 	h.proxy.Forward(w, r, target, endpointPath, rawBody, true)
 }
 
@@ -339,7 +365,6 @@ func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
 }
 
 func (h *Handler) handleReady(w http.ResponseWriter, _ *http.Request) {
-	// Readyz confirms the registry is initialized and accepting traffic
 	info := h.registry.Info()
 	if info == nil {
 		h.writeJSON(w, map[string]string{"status": "not_ready"}, http.StatusServiceUnavailable)
