@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: beagrid-agent
+  labels:
+    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/component: agent
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: beagrid
+      app.kubernetes.io/component: agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: beagrid
+        app.kubernetes.io/component: agent
+    spec:
+      containers:
+        - name: agent
+          image: ghcr.io/rafaribe/beagrid-agent:latest
+          args:
+            - --server=http://beagrid-server.default.svc.cluster.local
+            - --ollama=http://localhost:11434
+            - --priority=10
+          env:
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+      # Run only on nodes labeled with ollama
+      nodeSelector:
+        beagrid.io/ollama: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule

@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: beagrid-server
+  labels:
+    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: beagrid
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: beagrid
+        app.kubernetes.io/component: server
+    spec:
+      containers:
+        - name: server
+          image: ghcr.io/rafaribe/beagrid-server:latest
+          ports:
+            - containerPort: 8080
+              name: http
+          args:
+            - --port=8080
+            - --heartbeat-timeout=30s
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: beagrid-server
+  labels:
+    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/component: server
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http

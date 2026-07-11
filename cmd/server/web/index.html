@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beagrid — Inference Grid</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-2: #242836;
+            --border: #2d3248;
+            --text: #e4e7ec;
+            --text-dim: #8b92a5;
+            --accent: #6366f1;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --green: #10b981;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        .logo svg { width: 32px; height: 32px; }
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--surface-2);
+            border-radius: 99px;
+            font-size: 0.85rem;
+        }
+        .pulse {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+        main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            margin-top: 0.25rem;
+        }
+        .section-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .nodes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .node-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+        .node-card:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+        .node-card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+        }
+        .node-card.online::before { background: var(--green); }
+        .node-card.offline::before { background: var(--red); }
+        .node-card.draining::before { background: var(--yellow); }
+        .node-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+        .node-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+        }
+        .node-id { font-size: 0.75rem; color: var(--text-dim); font-family: monospace; }
+        .node-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .node-status.online { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+        .node-status.offline { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .node-status.draining { background: rgba(245, 158, 11, 0.15); color: var(--yellow); }
+        .node-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+            font-size: 0.85rem;
+        }
+        .node-meta dt { color: var(--text-dim); }
+        .node-meta dd { color: var(--text); font-weight: 500; }
+        .model-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+        }
+        .model-tag {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            padding: 0.2rem 0.6rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-family: monospace;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-dim);
+        }
+        .empty-state h2 { font-size: 1.5rem; margin-bottom: 0.5rem; color: var(--text); }
+        .topology {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .topo-server {
+            width: 80px; height: 80px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-align: center;
+            box-shadow: 0 0 30px var(--accent-glow);
+            position: relative;
+            z-index: 2;
+        }
+        .topo-nodes {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        .topo-node {
+            position: absolute;
+            width: 50px; height: 50px;
+            background: var(--surface-2);
+            border: 2px solid var(--green);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.6rem;
+            font-weight: 600;
+        }
+        .topo-node.offline { border-color: var(--red); opacity: 0.5; }
+        .topo-line {
+            position: absolute;
+            background: var(--border);
+            height: 2px;
+            transform-origin: left center;
+            z-index: 1;
+        }
+        .topo-line.active { background: var(--green); }
+        footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+            border-top: 1px solid var(--border);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">
+            <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="16" cy="16" r="14" stroke="#6366f1" stroke-width="2"/>
+                <circle cx="16" cy="16" r="4" fill="#6366f1"/>
+                <circle cx="8" cy="8" r="2.5" fill="#10b981"/>
+                <circle cx="24" cy="8" r="2.5" fill="#10b981"/>
+                <circle cx="8" cy="24" r="2.5" fill="#10b981"/>
+                <circle cx="24" cy="24" r="2.5" fill="#10b981"/>
+                <line x1="16" y1="16" x2="8" y2="8" stroke="#6366f1" stroke-width="1" opacity="0.6"/>
+                <line x1="16" y1="16" x2="24" y2="8" stroke="#6366f1" stroke-width="1" opacity="0.6"/>
+                <line x1="16" y1="16" x2="8" y2="24" stroke="#6366f1" stroke-width="1" opacity="0.6"/>
+                <line x1="16" y1="16" x2="24" y2="24" stroke="#6366f1" stroke-width="1" opacity="0.6"/>
+            </svg>
+            Beagrid
+        </div>
+        <div class="status-badge">
+            <span class="pulse"></span>
+            <span id="connection-status">Connecting...</span>
+        </div>
+    </header>
+    <main>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-nodes">-</div>
+                <div class="stat-label">Online Nodes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-models">-</div>
+                <div class="stat-label">Unique Models</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">-</div>
+                <div class="stat-label">Total Nodes</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-requests">-</div>
+                <div class="stat-label">Total Requests</div>
+            </div>
+        </div>
+
+        <h2 class="section-title">🌐 Grid Topology</h2>
+        <div class="topology" id="topology">
+            <div class="topo-server">BEAGRID<br>SERVER</div>
+            <div class="topo-nodes" id="topo-nodes"></div>
+        </div>
+
+        <h2 class="section-title">⚡ Connected Nodes</h2>
+        <div class="nodes-grid" id="nodes-grid">
+            <div class="empty-state">
+                <h2>No nodes connected</h2>
+                <p>Start an agent with: <code>beagrid-agent --server http://this-server:8080 --ollama http://localhost:11434</code></p>
+            </div>
+        </div>
+    </main>
+    <footer>Beagrid — Open-source inference grid for Ollama</footer>
+    <script>
+        const API_BASE = window.location.origin;
+        let refreshInterval;
+
+        async function fetchData() {
+            try {
+                const [infoRes, nodesRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/v1/grid/info`),
+                    fetch(`${API_BASE}/api/v1/nodes`)
+                ]);
+                const info = await infoRes.json();
+                const nodes = await nodesRes.json();
+
+                updateStats(info);
+                updateNodes(nodes);
+                updateTopology(nodes);
+                document.getElementById('connection-status').textContent = 'Connected';
+            } catch (err) {
+                document.getElementById('connection-status').textContent = 'Disconnected';
+            }
+        }
+
+        function updateStats(info) {
+            document.getElementById('stat-nodes').textContent = info.online_nodes;
+            document.getElementById('stat-models').textContent = info.total_models;
+            document.getElementById('stat-total').textContent = info.total_nodes;
+            document.getElementById('stat-requests').textContent = info.total_requests;
+        }
+
+        function updateNodes(nodes) {
+            const grid = document.getElementById('nodes-grid');
+            if (!nodes || nodes.length === 0) {
+                grid.innerHTML = `<div class="empty-state"><h2>No nodes connected</h2><p>Start an agent to join the grid</p></div>`;
+                return;
+            }
+            grid.innerHTML = nodes.map(node => `
+                <div class="node-card ${node.status}">
+                    <div class="node-header">
+                        <div>
+                            <div class="node-name">${escHtml(node.name)}</div>
+                            <div class="node-id">${node.id}</div>
+                        </div>
+                        <span class="node-status ${node.status}">${node.status}</span>
+                    </div>
+                    <dl class="node-meta">
+                        <dt>Priority</dt><dd>${node.priority}</dd>
+                        <dt>Last Seen</dt><dd>${timeAgo(node.last_seen)}</dd>
+                        <dt>Requests</dt><dd>${node.stats?.total_requests || 0}</dd>
+                        <dt>Active</dt><dd>${node.stats?.active_requests || 0}</dd>
+                    </dl>
+                    <div class="model-tags">
+                        ${(node.models || []).map(m => `<span class="model-tag">${escHtml(m.name)}</span>`).join('')}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateTopology(nodes) {
+            const container = document.getElementById('topo-nodes');
+            if (!nodes || nodes.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            const cx = container.offsetWidth / 2;
+            const cy = container.offsetHeight / 2;
+            const radius = Math.min(cx, cy) - 40;
+            let html = '';
+            nodes.forEach((node, i) => {
+                const angle = (2 * Math.PI * i / nodes.length) - Math.PI / 2;
+                const x = cx + radius * Math.cos(angle) - 25;
+                const y = cy + radius * Math.sin(angle) - 25;
+                const lx = cx;
+                const ly = cy;
+                const nx = x + 25;
+                const ny = y + 25;
+                const length = Math.sqrt((nx-lx)**2 + (ny-ly)**2);
+                const angleD = Math.atan2(ny-ly, nx-lx) * 180 / Math.PI;
+                const statusClass = node.status === 'online' ? 'active' : '';
+                html += `<div class="topo-line ${statusClass}" style="left:${lx}px;top:${ly}px;width:${length}px;transform:rotate(${angleD}deg)"></div>`;
+                html += `<div class="topo-node ${node.status}" style="left:${x}px;top:${y}px" title="${escHtml(node.name)}">${escHtml(node.name.slice(0,6))}</div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function timeAgo(ts) {
+            if (!ts) return 'never';
+            const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+            if (diff < 60) return `${Math.round(diff)}s ago`;
+            if (diff < 3600) return `${Math.round(diff/60)}m ago`;
+            return `${Math.round(diff/3600)}h ago`;
+        }
+
+        function escHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s || '';
+            return d.innerHTML;
+        }
+
+        fetchData();
+        refreshInterval = setInterval(fetchData, 5000);
+    </script>
+</body>
+</html>
