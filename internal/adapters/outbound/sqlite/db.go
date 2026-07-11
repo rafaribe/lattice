@@ -59,6 +59,28 @@ func migrate(db *sql.DB) error {
 		CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
 		CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
 		CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+
+		CREATE TABLE IF NOT EXISTS themes (
+			id          TEXT PRIMARY KEY,
+			name        TEXT UNIQUE NOT NULL,
+			author_id   TEXT NOT NULL DEFAULT '',
+			bg          TEXT NOT NULL,
+			surface     TEXT NOT NULL,
+			surface2    TEXT NOT NULL,
+			border      TEXT NOT NULL,
+			text_color  TEXT NOT NULL,
+			text_dim    TEXT NOT NULL,
+			accent      TEXT NOT NULL,
+			green       TEXT NOT NULL DEFAULT '#10b981',
+			red         TEXT NOT NULL DEFAULT '#ef4444',
+			yellow      TEXT NOT NULL DEFAULT '#f59e0b',
+			radius      TEXT NOT NULL DEFAULT '10px',
+			is_public   INTEGER NOT NULL DEFAULT 1,
+			created_at  TEXT NOT NULL,
+			updated_at  TEXT NOT NULL
+		);
+		CREATE INDEX IF NOT EXISTS idx_themes_name ON themes(name);
+		CREATE INDEX IF NOT EXISTS idx_themes_author ON themes(author_id);
 	`)
 	return err
 }
@@ -71,6 +93,9 @@ func (d *DB) Users() *UserStoreAdapter { return &UserStoreAdapter{db: d.db} }
 
 // Sessions returns the SessionStore adapter.
 func (d *DB) Sessions() *SessionStoreAdapter { return &SessionStoreAdapter{db: d.db} }
+
+// Themes returns the ThemeStore adapter.
+func (d *DB) Themes() *ThemeStoreAdapter { return &ThemeStoreAdapter{db: d.db} }
 
 // --- UserStoreAdapter ---
 

@@ -120,6 +120,11 @@ func main() {
 		if oidcProvider != nil {
 			logger.Info("OIDC routes registered: /auth/oidc/login, /auth/oidc/callback")
 		}
+
+		// Theme management (CRUD via /api/themes)
+		themeHandler := authAdapter.NewThemeHandler(db.Themes(), authHandler)
+		themeHandler.RegisterRoutes(mux)
+		logger.Info("theme routes registered: /api/themes")
 	}
 
 	// Serve embedded web UI at / (catch-all)

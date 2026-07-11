@@ -61,6 +61,62 @@
             --yellow: #f1fa8c;
             --radius: 8px;
         }
+        [data-theme="catppuccin-latte"] {
+            --bg: #eff1f5;
+            --surface: #e6e9ef;
+            --surface-2: #dce0e8;
+            --border: #ccd0da;
+            --text: #4c4f69;
+            --text-dim: #6c6f85;
+            --accent: #8839ef;
+            --accent-glow: rgba(136, 57, 239, 0.15);
+            --green: #40a02b;
+            --red: #d20f39;
+            --yellow: #df8e1d;
+            --radius: 10px;
+        }
+        [data-theme="catppuccin-frappe"] {
+            --bg: #303446;
+            --surface: #292c3c;
+            --surface-2: #414559;
+            --border: #51576d;
+            --text: #c6d0f5;
+            --text-dim: #a5adce;
+            --accent: #ca9ee6;
+            --accent-glow: rgba(202, 158, 230, 0.25);
+            --green: #a6d189;
+            --red: #e78284;
+            --yellow: #e5c890;
+            --radius: 10px;
+        }
+        [data-theme="catppuccin-macchiato"] {
+            --bg: #24273a;
+            --surface: #1e2030;
+            --surface-2: #363a4f;
+            --border: #494d64;
+            --text: #cad3f5;
+            --text-dim: #a5adcb;
+            --accent: #c6a0f6;
+            --accent-glow: rgba(198, 160, 246, 0.25);
+            --green: #a6da95;
+            --red: #ed8796;
+            --yellow: #eed49f;
+            --radius: 10px;
+        }
+        [data-theme="catppuccin-mocha"] {
+            --bg: #1e1e2e;
+            --surface: #181825;
+            --surface-2: #313244;
+            --border: #45475a;
+            --text: #cdd6f4;
+            --text-dim: #a6adc8;
+            --accent: #cba6f7;
+            --accent-glow: rgba(203, 166, 247, 0.25);
+            --green: #a6e3a1;
+            --red: #f38ba8;
+            --yellow: #f9e2af;
+            --radius: 10px;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
@@ -270,7 +326,7 @@
         <div class="settings-panel" onclick="event.stopPropagation()">
             <h3>⚙️ Settings</h3>
             <div class="settings-group">
-                <label>Theme</label>
+                <label>Built-in Themes</label>
                 <div class="theme-grid">
                     <div class="theme-option" data-theme="dark" onclick="setTheme('dark')">
                         <div class="theme-swatch" style="background: linear-gradient(135deg, #0f1117, #1a1d27)"></div>
@@ -288,7 +344,43 @@
                         <div class="theme-swatch" style="background: linear-gradient(135deg, #282a36, #ff79c6)"></div>
                         Dracula
                     </div>
+                    <div class="theme-option" data-theme="catppuccin-latte" onclick="setTheme('catppuccin-latte')">
+                        <div class="theme-swatch" style="background: linear-gradient(135deg, #eff1f5, #8839ef)"></div>
+                        Latte
+                    </div>
+                    <div class="theme-option" data-theme="catppuccin-frappe" onclick="setTheme('catppuccin-frappe')">
+                        <div class="theme-swatch" style="background: linear-gradient(135deg, #303446, #ca9ee6)"></div>
+                        Frappé
+                    </div>
+                    <div class="theme-option" data-theme="catppuccin-macchiato" onclick="setTheme('catppuccin-macchiato')">
+                        <div class="theme-swatch" style="background: linear-gradient(135deg, #24273a, #c6a0f6)"></div>
+                        Macchiato
+                    </div>
+                    <div class="theme-option" data-theme="catppuccin-mocha" onclick="setTheme('catppuccin-mocha')">
+                        <div class="theme-swatch" style="background: linear-gradient(135deg, #1e1e2e, #cba6f7)"></div>
+                        Mocha
+                    </div>
                 </div>
+            </div>
+            <div class="settings-group">
+                <label>Community Themes</label>
+                <div class="theme-grid" id="custom-themes-grid">
+                    <div style="grid-column:1/-1;color:var(--text-dim);font-size:0.75rem;text-align:center;">Loading...</div>
+                </div>
+            </div>
+            <div class="settings-group">
+                <label>Create Theme</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;">
+                    <input id="ct-name" placeholder="Theme name" style="grid-column:1/-1;padding:0.35rem;background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:4px;font-size:0.75rem;">
+                    <input id="ct-bg" type="color" value="#0f1117" title="Background">
+                    <input id="ct-surface" type="color" value="#1a1d27" title="Surface">
+                    <input id="ct-accent" type="color" value="#6366f1" title="Accent">
+                    <input id="ct-text" type="color" value="#e4e7ec" title="Text">
+                    <input id="ct-border" type="color" value="#2d3248" title="Border">
+                    <input id="ct-green" type="color" value="#10b981" title="Green">
+                </div>
+                <button onclick="createTheme()" style="margin-top:0.5rem;width:100%;padding:0.4rem;background:var(--accent);color:white;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Save Theme</button>
+                <div id="ct-msg" style="font-size:0.7rem;margin-top:0.3rem;color:var(--text-dim);"></div>
             </div>
             <div class="settings-group">
                 <label>Refresh interval</label>
@@ -327,14 +419,98 @@
     let timer;
 
     // --- Theme ---
+    let customThemes = [];
+
     function setTheme(t) {
-        document.documentElement.setAttribute('data-theme', t);
+        // Check if it's a custom theme (UUID)
+        const custom = customThemes.find(ct => ct.id === t);
+        if (custom) {
+            applyCustomTheme(custom);
+        } else {
+            document.documentElement.removeAttribute('style');
+            document.documentElement.setAttribute('data-theme', t);
+        }
         localStorage.setItem('beagrid-theme', t);
         document.querySelectorAll('.theme-option').forEach(el => el.classList.toggle('active', el.dataset.theme === t));
     }
+
+    function applyCustomTheme(t) {
+        document.documentElement.removeAttribute('data-theme');
+        const root = document.documentElement;
+        root.style.setProperty('--bg', t.bg);
+        root.style.setProperty('--surface', t.surface);
+        root.style.setProperty('--surface-2', t.surface2);
+        root.style.setProperty('--border', t.border);
+        root.style.setProperty('--text', t.text);
+        root.style.setProperty('--text-dim', t.text_dim);
+        root.style.setProperty('--accent', t.accent);
+        root.style.setProperty('--green', t.green);
+        root.style.setProperty('--red', t.red);
+        root.style.setProperty('--yellow', t.yellow);
+        root.style.setProperty('--radius', t.radius);
+    }
+
     function loadTheme() {
         const t = localStorage.getItem('beagrid-theme') || 'dark';
         setTheme(t);
+    }
+
+    async function loadCustomThemes() {
+        try {
+            const res = await fetch(`${API}/api/themes`);
+            if (!res.ok) { renderCustomThemes([]); return; }
+            customThemes = await res.json();
+            renderCustomThemes(customThemes);
+            // Re-apply if current theme is custom
+            const current = localStorage.getItem('beagrid-theme');
+            const match = customThemes.find(t => t.id === current);
+            if (match) applyCustomTheme(match);
+        } catch { renderCustomThemes([]); }
+    }
+
+    function renderCustomThemes(themes) {
+        const grid = document.getElementById('custom-themes-grid');
+        if (!themes.length) {
+            grid.innerHTML = '<div style="grid-column:1/-1;color:var(--text-dim);font-size:0.7rem;text-align:center;">No community themes yet</div>';
+            return;
+        }
+        grid.innerHTML = themes.map(t => `
+            <div class="theme-option" data-theme="${t.id}" onclick="setTheme('${t.id}')">
+                <div class="theme-swatch" style="background: linear-gradient(135deg, ${t.bg}, ${t.accent})"></div>
+                ${esc(t.name)}
+            </div>
+        `).join('');
+    }
+
+    async function createTheme() {
+        const msg = document.getElementById('ct-msg');
+        const name = document.getElementById('ct-name').value.trim();
+        if (!name) { msg.textContent = 'Name required'; return; }
+
+        const token = localStorage.getItem('beagrid-token');
+        const headers = {'Content-Type': 'application/json'};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const body = {
+            name,
+            bg: document.getElementById('ct-bg').value,
+            surface: document.getElementById('ct-surface').value,
+            surface2: document.getElementById('ct-surface').value,
+            accent: document.getElementById('ct-accent').value,
+            text: document.getElementById('ct-text').value,
+            border: document.getElementById('ct-border').value,
+            green: document.getElementById('ct-green').value,
+        };
+
+        try {
+            const res = await fetch(`${API}/api/themes`, { method:'POST', headers, body: JSON.stringify(body) });
+            const data = await res.json();
+            if (!res.ok) { msg.textContent = data.error || 'Failed'; return; }
+            msg.textContent = '✓ Theme created!';
+            document.getElementById('ct-name').value = '';
+            loadCustomThemes();
+            setTheme(data.id);
+        } catch(e) { msg.textContent = 'Error: ' + e.message; }
     }
 
     // --- Settings ---
@@ -424,6 +600,7 @@
 
     // Init
     loadTheme();
+    loadCustomThemes();
     const savedInterval = localStorage.getItem('beagrid-refresh');
     if (savedInterval) { interval = parseInt(savedInterval); document.getElementById('refresh-interval').value = savedInterval; }
     fetchAll();
