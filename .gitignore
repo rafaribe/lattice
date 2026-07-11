@@ -1,7 +1,34 @@
+# Build output
 bin/
+dist/
 *.exe
 *.test
 *.out
-.env
-.DS_Store
+
+# Go
 vendor/
+coverage.out
+coverage.html
+*.prof
+*.pprof
+
+# Environment
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Docker
+.docker/
+
+# mise
+.mise.local.toml

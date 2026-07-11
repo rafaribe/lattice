@@ -1,5 +1,4 @@
-// Package agent implements the beagrid agent daemon and engine detection.
-package agent
+package engine
 
 import (
 	"context"
@@ -19,7 +18,7 @@ type engineProbe struct {
 	Kind  string // "ollama", "openai", "comfyui"
 }
 
-// Probes are tried in priority order (same as autonomous-grid).
+// Probes are tried in priority order.
 var defaultProbes = []engineProbe{
 	{Label: "ollama", Port: 11434, Kind: "ollama"},
 	{Label: "lm-studio", Port: 1234, Kind: "openai"},
@@ -29,12 +28,13 @@ var defaultProbes = []engineProbe{
 	{Label: "comfyui", Port: 8188, Kind: "comfyui"},
 }
 
-// Detector implements EngineDetector by probing well-known local ports.
+// Detector implements the application.EngineDetector port by probing well-known local ports.
 type Detector struct {
 	client  *http.Client
 	timeout time.Duration
 }
 
+// NewDetector creates a new engine detector adapter.
 func NewDetector() *Detector {
 	return &Detector{
 		client:  &http.Client{Timeout: 2 * time.Second},
@@ -67,7 +67,7 @@ func (d *Detector) Detect(ctx context.Context) ([]domain.DetectedEngine, error) 
 				})
 			}
 		case "openai":
-			models := d.probeOpenAI(ctx, probe.Port)
+			models := d.ProbeOpenAI(ctx, probe.Port)
 			if models != nil {
 				found = append(found, domain.DetectedEngine{
 					Label:       probe.Label,
@@ -87,11 +87,11 @@ func (d *Detector) probeOllama(ctx context.Context, port int) []string {
 	if models != nil {
 		return models
 	}
-	// Fallback to OpenAI-compatible endpoint
-	return d.probeOpenAI(ctx, port)
+	return d.ProbeOpenAI(ctx, port)
 }
 
-func (d *Detector) probeOpenAI(ctx context.Context, port int) []string {
+// ProbeOpenAI probes an OpenAI-compatible /v1/models endpoint.
+func (d *Detector) ProbeOpenAI(ctx context.Context, port int) []string {
 	url := fmt.Sprintf("http://127.0.0.1:%d/v1/models", port)
 	return d.readJSONList(ctx, url, "data", "id")
 }

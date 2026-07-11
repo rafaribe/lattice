@@ -1,4 +1,5 @@
-package server
+// Package registry provides the in-memory node registry outbound adapter.
+package registry
 
 import (
 	"context"
@@ -13,8 +14,8 @@ import (
 
 const DefaultNodeTTL = 60 // seconds
 
-// Registry is an in-memory implementation of the NodeRegistry port.
-type Registry struct {
+// Memory is an in-memory implementation of the application.NodeRegistry port.
+type Memory struct {
 	mu     sync.RWMutex
 	nodes  map[string]*domain.Node
 	gridID string
@@ -22,11 +23,12 @@ type Registry struct {
 	ttl    int // seconds
 }
 
-func NewRegistry(gridID, name string, ttl int) *Registry {
+// New creates a new in-memory registry and starts the background reaper.
+func New(gridID, name string, ttl int) *Memory {
 	if ttl <= 0 {
 		ttl = DefaultNodeTTL
 	}
-	r := &Registry{
+	r := &Memory{
 		nodes:  make(map[string]*domain.Node),
 		gridID: gridID,
 		name:   name,
@@ -36,7 +38,9 @@ func NewRegistry(gridID, name string, ttl int) *Registry {
 	return r
 }
 
-func (r *Registry) Create(_ context.Context, req domain.NodeCreateRequest) (*domain.NodeCreateResponse, error) {
+func (r *Memory) TTL() int { return r.ttl }
+
+func (r *Memory) Create(_ context.Context, req domain.NodeCreateRequest) (*domain.NodeCreateResponse, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -61,7 +65,7 @@ func (r *Registry) Create(_ context.Context, req domain.NodeCreateRequest) (*dom
 	return &domain.NodeCreateResponse{NodeID: nodeID, Role: role}, nil
 }
 
-func (r *Registry) Update(_ context.Context, nodeID string, req domain.NodeUpdateRequest) (*domain.Node, error) {
+func (r *Memory) Update(_ context.Context, nodeID string, req domain.NodeUpdateRequest) (*domain.Node, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -93,7 +97,7 @@ func (r *Registry) Update(_ context.Context, nodeID string, req domain.NodeUpdat
 	return node, nil
 }
 
-func (r *Registry) Heartbeat(_ context.Context, req domain.HeartbeatRequest) error {
+func (r *Memory) Heartbeat(_ context.Context, req domain.HeartbeatRequest) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -106,7 +110,7 @@ func (r *Registry) Heartbeat(_ context.Context, req domain.HeartbeatRequest) err
 	return nil
 }
 
-func (r *Registry) Delete(_ context.Context, nodeID string) error {
+func (r *Memory) Delete(_ context.Context, nodeID string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if _, ok := r.nodes[nodeID]; !ok {
@@ -116,7 +120,7 @@ func (r *Registry) Delete(_ context.Context, nodeID string) error {
 	return nil
 }
 
-func (r *Registry) Get(_ context.Context, nodeID string) (*domain.Node, error) {
+func (r *Memory) Get(_ context.Context, nodeID string) (*domain.Node, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	node, ok := r.nodes[nodeID]
@@ -128,7 +132,7 @@ func (r *Registry) Get(_ context.Context, nodeID string) (*domain.Node, error) {
 
 // Discover returns active engine nodes, optionally filtered by model.
 // Stale nodes are reaped. Results sorted by load score ascending.
-func (r *Registry) Discover(_ context.Context, model string) ([]*domain.Node, error) {
+func (r *Memory) Discover(_ context.Context, model string) ([]*domain.Node, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -174,7 +178,7 @@ func (r *Registry) Discover(_ context.Context, model string) ([]*domain.Node, er
 	return engines, nil
 }
 
-func (r *Registry) Info() *domain.GridInfo {
+func (r *Memory) Info() *domain.GridInfo {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -199,7 +203,7 @@ func (r *Registry) Info() *domain.GridInfo {
 }
 
 // reaper removes stale nodes in the background.
-func (r *Registry) reaper() {
+func (r *Memory) reaper() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {

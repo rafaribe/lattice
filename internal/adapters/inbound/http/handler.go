@@ -1,4 +1,5 @@
-package server
+// Package http provides the inbound HTTP adapter for the beagrid server.
+package http
 
 import (
 	"encoding/json"
@@ -8,29 +9,33 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rafaribe/beagrid/internal/application"
 	"github.com/rafaribe/beagrid/internal/domain"
 )
 
 // Handler provides all HTTP endpoints for the beagrid server.
+// It is an inbound adapter that translates HTTP requests into application port calls.
 type Handler struct {
-	registry *Registry
+	registry application.NodeRegistry
+	proxy    application.EngineProxy
 	logger   *slog.Logger
-	client   *http.Client
 }
 
-func NewHandler(registry *Registry, logger *slog.Logger) *Handler {
+// NewHandler creates a new HTTP inbound adapter.
+func NewHandler(registry application.NodeRegistry, proxy application.EngineProxy, logger *slog.Logger) *Handler {
 	return &Handler{
 		registry: registry,
+		proxy:    proxy,
 		logger:   logger,
-		client:   &http.Client{Timeout: 600 * time.Second},
 	}
 }
 
+// RegisterRoutes wires all HTTP routes to the handler methods.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Grid info
 	mux.HandleFunc("GET /grid/info", h.handleGridInfo)
 
-	// Node lifecycle (matches autonomous-grid exactly)
+	// Node lifecycle
 	mux.HandleFunc("POST /nodes", h.handleCreateNode)
 	mux.HandleFunc("PUT /nodes/{node_id}", h.handleUpdateNode)
 	mux.HandleFunc("POST /nodes/heartbeat", h.handleHeartbeat)
@@ -42,7 +47,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/chat/completions", h.handleChatCompletions)
 	mux.HandleFunc("POST /v1/completions", h.handleCompletions)
 
-	// Media placeholder endpoints
+	// Media endpoints
 	mux.HandleFunc("POST /v1/media/image/generate", h.handleMediaProxy)
 	mux.HandleFunc("POST /v1/media/image/edit", h.handleMediaProxy)
 	mux.HandleFunc("POST /v1/media/video/i2v", h.handleMediaProxy)
@@ -50,7 +55,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	// Health
 	mux.HandleFunc("GET /healthz", h.handleHealth)
 
-	// Legacy aliases for our own API consumers
+	// Legacy aliases
 	mux.HandleFunc("GET /api/v1/nodes", h.handleDiscoverLegacy)
 	mux.HandleFunc("GET /api/v1/grid/info", h.handleGridInfo)
 }
@@ -58,7 +63,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 // --- Grid Info ---
 
 func (h *Handler) handleGridInfo(w http.ResponseWriter, _ *http.Request) {
-	h.json(w, h.registry.Info(), http.StatusOK)
+	h.writeJSON(w, h.registry.Info(), http.StatusOK)
 }
 
 // --- Node Lifecycle ---
@@ -75,7 +80,7 @@ func (h *Handler) handleCreateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.Info("node created", "node_id", resp.NodeID, "role", resp.Role)
-	h.json(w, resp, http.StatusOK)
+	h.writeJSON(w, resp, http.StatusOK)
 }
 
 func (h *Handler) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
@@ -108,7 +113,7 @@ func (h *Handler) handleUpdateNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.Info("node updated", "node_id", nodeID, "models", node.Models)
-	h.json(w, map[string]any{"status": "updated", "node": node}, http.StatusOK)
+	h.writeJSON(w, map[string]any{"status": "updated", "node": node}, http.StatusOK)
 }
 
 func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
@@ -121,7 +126,7 @@ func (h *Handler) handleHeartbeat(w http.ResponseWriter, r *http.Request) {
 		h.openaiError(w, 404, "node not found", "not_found")
 		return
 	}
-	h.json(w, map[string]any{"ttl_seconds": h.registry.ttl}, http.StatusOK)
+	h.writeJSON(w, map[string]any{"ttl_seconds": h.registry.TTL()}, http.StatusOK)
 }
 
 func (h *Handler) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
@@ -131,18 +136,18 @@ func (h *Handler) handleDeleteNode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.logger.Info("node unregistered", "node_id", nodeID)
-	h.json(w, map[string]string{"status": "unregistered"}, http.StatusOK)
+	h.writeJSON(w, map[string]string{"status": "unregistered"}, http.StatusOK)
 }
 
 func (h *Handler) handleDiscover(w http.ResponseWriter, r *http.Request) {
 	model := r.URL.Query().Get("model")
 	engines, _ := h.registry.Discover(r.Context(), model)
-	h.json(w, map[string]any{"engines": engines}, http.StatusOK)
+	h.writeJSON(w, map[string]any{"engines": engines}, http.StatusOK)
 }
 
 func (h *Handler) handleDiscoverLegacy(w http.ResponseWriter, r *http.Request) {
 	engines, _ := h.registry.Discover(r.Context(), "")
-	h.json(w, engines, http.StatusOK)
+	h.writeJSON(w, engines, http.StatusOK)
 }
 
 // --- OpenAI Endpoints ---
@@ -167,7 +172,7 @@ func (h *Handler) handleModels(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
-	h.json(w, domain.OpenAIModelList{Object: "list", Data: data}, http.StatusOK)
+	h.writeJSON(w, domain.OpenAIModelList{Object: "list", Data: data}, http.StatusOK)
 }
 
 func (h *Handler) handleChatCompletions(w http.ResponseWriter, r *http.Request) {
@@ -212,74 +217,8 @@ func (h *Handler) proxyOpenAI(w http.ResponseWriter, r *http.Request, endpointPa
 		rawBody, _ = json.Marshal(body)
 	}
 
-	url := trimSlash(target.EndpointURL) + "/" + endpointPath
 	stream, _ := body["stream"].(bool)
-
-	proxyReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, strings.NewReader(string(rawBody)))
-	if err != nil {
-		h.openaiError(w, 502, "Failed to create proxy request: "+err.Error(), "engine_error")
-		return
-	}
-	proxyReq.Header.Set("Content-Type", "application/json")
-
-	if stream {
-		h.proxyStream(w, proxyReq, target)
-	} else {
-		h.proxyDirect(w, proxyReq, target)
-	}
-}
-
-func (h *Handler) proxyDirect(w http.ResponseWriter, proxyReq *http.Request, target *domain.Node) {
-	resp, err := h.client.Do(proxyReq)
-	if err != nil {
-		h.openaiError(w, 502, "Engine request failed: "+err.Error(), "engine_error")
-		return
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" {
-		ct = "application/json"
-	}
-	w.Header().Set("Content-Type", ct)
-	w.WriteHeader(resp.StatusCode)
-	w.Write(respBody)
-}
-
-func (h *Handler) proxyStream(w http.ResponseWriter, proxyReq *http.Request, target *domain.Node) {
-	transport := &http.Transport{}
-	streamClient := &http.Client{Transport: transport, Timeout: 0}
-	resp, err := streamClient.Do(proxyReq)
-	if err != nil {
-		h.openaiError(w, 502, "Engine stream request failed: "+err.Error(), "engine_error")
-		return
-	}
-	defer resp.Body.Close()
-
-	ct := resp.Header.Get("Content-Type")
-	if ct == "" {
-		ct = "text/event-stream"
-	}
-	w.Header().Set("Content-Type", ct)
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
-	w.WriteHeader(resp.StatusCode)
-
-	flusher, _ := w.(http.Flusher)
-	buf := make([]byte, 4096)
-	for {
-		n, readErr := resp.Body.Read(buf)
-		if n > 0 {
-			w.Write(buf[:n])
-			if flusher != nil {
-				flusher.Flush()
-			}
-		}
-		if readErr != nil {
-			break
-		}
-	}
+	h.proxy.Forward(w, r, target, endpointPath, rawBody, stream)
 }
 
 // --- Media Proxy ---
@@ -291,7 +230,6 @@ func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine media model from endpoint path
 	path := r.URL.Path
 	var model string
 	switch {
@@ -317,28 +255,19 @@ func (h *Handler) handleMediaProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Strip /v1/ prefix for media proxy
 	endpointPath := strings.TrimPrefix(path, "/v1/")
-	url := trimSlash(target.MediaURL) + "/" + endpointPath
-
-	proxyReq, err := http.NewRequestWithContext(r.Context(), http.MethodPost, url, strings.NewReader(string(rawBody)))
-	if err != nil {
-		h.openaiError(w, 502, "Failed to create media proxy request: "+err.Error(), "engine_error")
-		return
-	}
-	proxyReq.Header.Set("Content-Type", r.Header.Get("Content-Type"))
-	h.proxyStream(w, proxyReq, target)
+	h.proxy.Forward(w, r, target, endpointPath, rawBody, true)
 }
 
 // --- Health ---
 
 func (h *Handler) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	h.json(w, map[string]string{"status": "ok"}, http.StatusOK)
+	h.writeJSON(w, map[string]string{"status": "ok"}, http.StatusOK)
 }
 
 // --- Helpers ---
 
-func (h *Handler) json(w http.ResponseWriter, data any, status int) {
+func (h *Handler) writeJSON(w http.ResponseWriter, data any, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)

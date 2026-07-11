@@ -1,4 +1,4 @@
-package agent
+package engine
 
 import (
 	"context"
@@ -7,22 +7,17 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rafaribe/beagrid/internal/application"
 )
 
-// OllamaModel is a model from the Ollama /api/tags response.
-type OllamaModel struct {
-	Name       string `json:"name"`
-	Size       int64  `json:"size"`
-	Digest     string `json:"digest"`
-	ModifiedAt string `json:"modified_at"`
-}
-
-// OllamaAdapter talks to a local Ollama instance.
+// OllamaAdapter implements the application.OllamaClient port.
 type OllamaAdapter struct {
 	baseURL string
 	client  *http.Client
 }
 
+// NewOllamaAdapter creates a new Ollama outbound adapter.
 func NewOllamaAdapter(baseURL string) *OllamaAdapter {
 	return &OllamaAdapter{
 		baseURL: strings.TrimRight(baseURL, "/"),
@@ -30,7 +25,7 @@ func NewOllamaAdapter(baseURL string) *OllamaAdapter {
 	}
 }
 
-func (o *OllamaAdapter) ListModels(ctx context.Context) ([]OllamaModel, error) {
+func (o *OllamaAdapter) ListModels(ctx context.Context) ([]application.OllamaModel, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, o.baseURL+"/api/tags", nil)
 	if err != nil {
 		return nil, err
@@ -46,12 +41,27 @@ func (o *OllamaAdapter) ListModels(ctx context.Context) ([]OllamaModel, error) {
 	}
 
 	var result struct {
-		Models []OllamaModel `json:"models"`
+		Models []struct {
+			Name       string `json:"name"`
+			Size       int64  `json:"size"`
+			Digest     string `json:"digest"`
+			ModifiedAt string `json:"modified_at"`
+		} `json:"models"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decoding ollama response: %w", err)
 	}
-	return result.Models, nil
+
+	models := make([]application.OllamaModel, 0, len(result.Models))
+	for _, m := range result.Models {
+		models = append(models, application.OllamaModel{
+			Name:       m.Name,
+			Size:       m.Size,
+			Digest:     m.Digest,
+			ModifiedAt: m.ModifiedAt,
+		})
+	}
+	return models, nil
 }
 
 func (o *OllamaAdapter) IsHealthy(ctx context.Context) bool {

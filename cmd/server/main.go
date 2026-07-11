@@ -9,7 +9,10 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rafaribe/beagrid/internal/server"
+	// Adapters (wired here in the composition root)
+	httpAdapter "github.com/rafaribe/beagrid/internal/adapters/inbound/http"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/registry"
 )
 
 //go:embed all:web
@@ -38,16 +41,17 @@ func main() {
 		gid = fmt.Sprintf("bg-%s-%s", *gridName, "local")
 	}
 
-	registry := server.NewRegistry(gid, *gridName, *nodeTTL)
-	handler := server.NewHandler(registry, logger)
+	// --- Composition Root: wire adapters into ports ---
 
+	// Outbound adapters
+	reg := registry.New(gid, *gridName, *nodeTTL)
+	proxy := engine.NewProxy(logger)
+
+	// Inbound adapter (HTTP handler consumes outbound ports)
+	handler := httpAdapter.NewHandler(reg, proxy, logger)
+
+	// --- HTTP Mux ---
 	mux := http.NewServeMux()
-
-	// Root serves grid info (like autonomous-grid)
-	mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		handler.RegisterRoutes(mux)
-	})
-
 	handler.RegisterRoutes(mux)
 
 	// Serve embedded web UI at /ui/

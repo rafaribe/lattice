@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/rafaribe/beagrid/internal/agent"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
 )
 
 var version = "dev"
@@ -22,6 +23,7 @@ func main() {
 	endpointURL := flag.String("at", "", "URL of an existing OpenAI-compatible engine")
 	detectAll := flag.Bool("all", false, "Detect and join all local engines")
 	interval := flag.Float64("heartbeat-interval", 15.0, "Heartbeat interval in seconds")
+	pollInterval := flag.Float64("poll-interval", 300.0, "Model discovery polling interval in seconds (default 5m)")
 	showVersion := flag.Bool("version", false, "Print version and exit")
 	flag.Parse()
 
@@ -33,16 +35,22 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	logger.Info("beagrid agent starting", "server", *serverURL, "version", version)
 
+	// --- Composition Root: wire outbound adapters ---
+	detector := engine.NewDetector()
+	ollama := engine.NewOllamaAdapter(*ollamaURL)
+	gridClient := engine.NewGridClient(*serverURL)
+
 	cfg := agent.DaemonConfig{
-		ServerURL:   *serverURL,
-		OllamaURL:   *ollamaURL,
-		Name:        *name,
-		EndpointURL: *endpointURL,
-		AutoDetect:  *detectAll,
-		Interval:    time.Duration(*interval * float64(time.Second)),
+		ServerURL:    *serverURL,
+		OllamaURL:    *ollamaURL,
+		Name:         *name,
+		EndpointURL:  *endpointURL,
+		AutoDetect:   *detectAll,
+		Interval:     time.Duration(*interval * float64(time.Second)),
+		PollInterval: time.Duration(*pollInterval * float64(time.Second)),
 	}
 
-	daemon := agent.NewDaemon(cfg, logger)
+	daemon := agent.NewDaemon(cfg, detector, ollama, gridClient, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

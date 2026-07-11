@@ -1,0 +1,119 @@
+[tools]
+go = "1.26"
+golangci-lint = "latest"
+
+[env]
+BEAGRID_PORT = "8090"
+BEAGRID_NAME = "home"
+CGO_ENABLED = "0"
+
+# ---------- Build ----------
+
+[tasks.build]
+description = "Build all binaries"
+run = "go build -ldflags='-s -w' -o bin/beagrid-server ./cmd/server && go build -ldflags='-s -w' -o bin/beagrid-agent ./cmd/agent && go build -ldflags='-s -w' -o bin/beagrid ./cmd/beagrid"
+
+[tasks."build:server"]
+description = "Build server binary"
+run = "go build -ldflags='-s -w' -o bin/beagrid-server ./cmd/server"
+
+[tasks."build:agent"]
+description = "Build agent binary"
+run = "go build -ldflags='-s -w' -o bin/beagrid-agent ./cmd/agent"
+
+[tasks."build:cli"]
+description = "Build CLI binary"
+run = "go build -ldflags='-s -w' -o bin/beagrid ./cmd/beagrid"
+
+# ---------- Test ----------
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./... -v -race"
+
+[tasks."test:short"]
+description = "Run tests (skip long-running)"
+run = "go test ./... -short -race"
+
+[tasks."test:cover"]
+description = "Run tests with coverage report"
+run = """
+go test ./... -race -coverprofile=coverage.out -covermode=atomic
+go tool cover -html=coverage.out -o coverage.html
+echo "Coverage report: coverage.html"
+"""
+
+[tasks."test:watch"]
+description = "Watch files and re-run tests on change"
+run = """
+command -v watchexec >/dev/null 2>&1 || { echo "Install watchexec: cargo install watchexec-cli"; exit 1; }
+watchexec -e go -- go test ./... -race -count=1
+"""
+
+# ---------- Lint ----------
+
+[tasks.lint]
+description = "Run linters"
+run = "golangci-lint run ./..."
+
+[tasks."lint:fix"]
+description = "Run linters with auto-fix"
+run = "golangci-lint run --fix ./..."
+
+[tasks.fmt]
+description = "Format Go source files"
+run = "gofmt -s -w ."
+
+[tasks.vet]
+description = "Run go vet"
+run = "go vet ./..."
+
+# ---------- Run ----------
+
+[tasks.run]
+description = "Run server locally"
+run = "go run ./cmd/server --port ${BEAGRID_PORT} --name ${BEAGRID_NAME}"
+
+[tasks."run:agent"]
+description = "Run agent pointing at local server and Ollama"
+run = "go run ./cmd/agent --server http://localhost:${BEAGRID_PORT} --ollama http://localhost:11434"
+
+# ---------- Docker ----------
+
+[tasks."docker:up"]
+description = "Start local dev stack (server + ollama + agent)"
+run = "docker compose up --build -d"
+
+[tasks."docker:down"]
+description = "Stop local dev stack"
+run = "docker compose down"
+
+[tasks."docker:logs"]
+description = "Tail compose logs"
+run = "docker compose logs -f"
+
+[tasks."docker:build"]
+description = "Build Docker images"
+run = "docker compose build"
+
+# ---------- CI ----------
+
+[tasks.ci]
+description = "Run full CI pipeline (fmt check, vet, lint, test)"
+run = """
+echo "==> Checking formatting..."
+test -z "$(gofmt -l .)" || { echo "Run 'mise run fmt' to fix formatting"; gofmt -l .; exit 1; }
+echo "==> Running vet..."
+go vet ./...
+echo "==> Running linter..."
+golangci-lint run ./...
+echo "==> Running tests..."
+go test ./... -race -count=1
+echo "==> CI passed ✓"
+"""
+
+# ---------- Clean ----------
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -rf bin/ coverage.out coverage.html *.prof"

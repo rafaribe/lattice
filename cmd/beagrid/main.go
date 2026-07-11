@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rafaribe/beagrid/internal/agent"
+	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
 )
 
 var version = "dev"
@@ -176,6 +177,7 @@ func cmdJoin() *cobra.Command {
 	var ollamaURL string
 	var detectAll bool
 	var interval float64
+	var pollInterval float64
 
 	cmd := &cobra.Command{
 		Use:   "join [grid]",
@@ -192,18 +194,22 @@ func cmdJoin() *cobra.Command {
 			go func() { <-sigCh; cancel() }()
 
 			cfg := agent.DaemonConfig{
-				ServerURL:   gridURL,
-				OllamaURL:   ollamaURL,
-				Name:        name,
-				EndpointURL: atURL,
-				Models:      models,
-				AdvertiseAs: advertiseAs,
-				AutoDetect:  detectAll,
-				Interval:    time.Duration(interval * float64(time.Second)),
+				ServerURL:    gridURL,
+				OllamaURL:    ollamaURL,
+				Name:         name,
+				EndpointURL:  atURL,
+				Models:       models,
+				AdvertiseAs:  advertiseAs,
+				AutoDetect:   detectAll,
+				Interval:     time.Duration(interval * float64(time.Second)),
+				PollInterval: time.Duration(pollInterval * float64(time.Second)),
 			}
 
 			logger := newLogger()
-			daemon := agent.NewDaemon(cfg, logger)
+			detector := engine.NewDetector()
+			ollama := engine.NewOllamaAdapter(ollamaURL)
+			gridClient := engine.NewGridClient(gridURL)
+			daemon := agent.NewDaemon(cfg, detector, ollama, gridClient, logger)
 			return daemon.Run(ctx)
 		},
 	}
@@ -214,6 +220,7 @@ func cmdJoin() *cobra.Command {
 	cmd.Flags().StringVar(&ollamaURL, "ollama", "http://localhost:11434", "Ollama URL")
 	cmd.Flags().BoolVar(&detectAll, "all", false, "Join every detected engine")
 	cmd.Flags().Float64Var(&interval, "heartbeat-interval", 15.0, "Heartbeat interval in seconds")
+	cmd.Flags().Float64Var(&pollInterval, "poll-interval", 300.0, "Model discovery polling interval in seconds (default 5m)")
 	return cmd
 }
 
@@ -436,7 +443,7 @@ func httpGet(url string) ([]byte, error) {
 }
 
 func localIP() string {
-	return agent.DetectLocalIP()
+	return engine.DetectLocalIP()
 }
 
 func newLogger() *slog.Logger {

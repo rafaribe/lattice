@@ -1,3 +1,12 @@
+# Beagrid — Local Development Compose
+#
+# Usage:
+#   docker compose up                  # server + ollama + agent (default stack)
+#   docker compose up server           # server only (for testing with external engines)
+#   docker compose --profile gpu up    # enable GPU passthrough for Ollama
+#
+# The server UI is at http://localhost:8090/ui/
+
 services:
   # Beagrid server — the central grid endpoint
   server:
@@ -15,6 +24,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    restart: unless-stopped
 
   # Ollama instance (simulates a GPU node)
   ollama:
@@ -23,14 +33,34 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # Uncomment for GPU passthrough:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Ollama with GPU passthrough
+  ollama-gpu:
+    image: ollama/ollama:latest
+    profiles: ["gpu"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget -q --spider http://localhost:11434/api/tags || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   # Beagrid agent — discovers Ollama and registers with server
   agent:
@@ -46,7 +76,8 @@ services:
       server:
         condition: service_healthy
       ollama:
-        condition: service_started
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   ollama_data:

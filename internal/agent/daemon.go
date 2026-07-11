@@ -1,51 +1,61 @@
 package agent
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rafaribe/beagrid/internal/application"
 	"github.com/rafaribe/beagrid/internal/domain"
 )
 
 // Daemon is the agent that registers engines with the beagrid server.
+// It orchestrates detection, registration, and heartbeat via injected ports.
 type Daemon struct {
-	serverURL      string
-	ollamaURL      string
-	name           string
-	nodeID         string
-	interval       time.Duration
-	advertiseHost  string
-	models         []string   // explicit model list (or discovered)
-	advertiseAs    []string   // aliases
-	endpointURL    string     // explicit endpoint (or auto)
-	autoDetect     bool       // detect all local engines
-	detector       *Detector
-	httpClient     *http.Client
-	logger         *slog.Logger
+	serverURL    string
+	ollamaURL    string
+	name         string
+	nodeID       string
+	interval     time.Duration
+	pollInterval time.Duration
+	models       []string
+	advertiseAs  []string
+	endpointURL  string
+	autoDetect   bool
+
+	// Outbound ports (injected)
+	detector   application.EngineDetector
+	ollama     application.OllamaClient
+	gridClient application.GridServer
+
+	logger *slog.Logger
 }
 
 // DaemonConfig holds all agent configuration.
 type DaemonConfig struct {
-	ServerURL     string
-	OllamaURL     string
-	Name          string
-	EndpointURL   string
-	Models        []string
-	AdvertiseAs   []string
-	AdvertiseHost string
-	AutoDetect    bool
-	Interval      time.Duration
+	ServerURL    string
+	OllamaURL    string
+	Name         string
+	EndpointURL  string
+	Models       []string
+	AdvertiseAs  []string
+	AutoDetect   bool
+	Interval     time.Duration
+	PollInterval time.Duration
 }
 
-func NewDaemon(cfg DaemonConfig, logger *slog.Logger) *Daemon {
+// NewDaemon creates a new agent daemon with injected outbound adapters.
+func NewDaemon(
+	cfg DaemonConfig,
+	detector application.EngineDetector,
+	ollama application.OllamaClient,
+	gridClient application.GridServer,
+	logger *slog.Logger,
+) *Daemon {
 	name := cfg.Name
 	if name == "" {
 		name, _ = os.Hostname()
@@ -54,21 +64,26 @@ func NewDaemon(cfg DaemonConfig, logger *slog.Logger) *Daemon {
 	if interval == 0 {
 		interval = 15 * time.Second
 	}
+	pollInterval := cfg.PollInterval
+	if pollInterval == 0 {
+		pollInterval = 5 * time.Minute
+	}
 
 	return &Daemon{
-		serverURL:     strings.TrimRight(cfg.ServerURL, "/"),
-		ollamaURL:     cfg.OllamaURL,
-		name:          name,
-		nodeID:        "node-" + uuid.New().String()[:12],
-		interval:      interval,
-		advertiseHost: cfg.AdvertiseHost,
-		models:        cfg.Models,
-		advertiseAs:   cfg.AdvertiseAs,
-		endpointURL:   cfg.EndpointURL,
-		autoDetect:    cfg.AutoDetect,
-		detector:      NewDetector(),
-		httpClient:    &http.Client{Timeout: 10 * time.Second},
-		logger:        logger,
+		serverURL:    strings.TrimRight(cfg.ServerURL, "/"),
+		ollamaURL:    cfg.OllamaURL,
+		name:         name,
+		nodeID:       "node-" + uuid.New().String()[:12],
+		interval:     interval,
+		pollInterval: pollInterval,
+		models:       cfg.Models,
+		advertiseAs:  cfg.AdvertiseAs,
+		endpointURL:  cfg.EndpointURL,
+		autoDetect:   cfg.AutoDetect,
+		detector:     detector,
+		ollama:       ollama,
+		gridClient:   gridClient,
+		logger:       logger,
 	}
 }
 
@@ -87,18 +102,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 	} else if d.endpointURL != "" {
 		// Explicit external engine
 		models := d.models
-		if len(models) == 0 {
-			// Try to discover from the endpoint
-			openaiModels := d.detector.probeOpenAI(ctx, 0)
-			if openaiModels == nil && d.ollamaURL != "" {
-				// Try Ollama tags
-				adapter := NewOllamaAdapter(d.ollamaURL)
-				ollamaModels, _ := adapter.ListModels(ctx)
-				for _, m := range ollamaModels {
-					models = append(models, m.Name)
-				}
-			} else {
-				models = openaiModels
+		if len(models) == 0 && d.ollamaURL != "" {
+			ollamaModels, _ := d.ollama.ListModels(ctx)
+			for _, m := range ollamaModels {
+				models = append(models, m.Name)
 			}
 		}
 		engines = []domain.DetectedEngine{{
@@ -109,11 +116,10 @@ func (d *Daemon) Run(ctx context.Context) error {
 	} else {
 		// Default: probe Ollama at the configured URL
 		d.logger.Info("probing ollama", "url", d.ollamaURL)
-		if err := d.waitForEndpoint(ctx, d.ollamaURL); err != nil {
-			return err
+		if !d.ollama.IsHealthy(ctx) {
+			return fmt.Errorf("ollama at %s not reachable", d.ollamaURL)
 		}
-		adapter := NewOllamaAdapter(d.ollamaURL)
-		ollamaModels, err := adapter.ListModels(ctx)
+		ollamaModels, err := d.ollama.ListModels(ctx)
 		if err != nil {
 			return fmt.Errorf("listing ollama models: %w", err)
 		}
@@ -142,15 +148,14 @@ func (d *Daemon) Run(ctx context.Context) error {
 	upstream := map[string]string{}
 	var primaryEndpoint string
 
-	for _, engine := range engines {
-		if engine.Media {
-			// Media engines use their own endpoint
+	for _, eng := range engines {
+		if eng.Media {
 			continue
 		}
 		if primaryEndpoint == "" {
-			primaryEndpoint = engine.EndpointURL
+			primaryEndpoint = eng.EndpointURL
 		}
-		for i, m := range engine.Models {
+		for i, m := range eng.Models {
 			advertised := m
 			if i < len(d.advertiseAs) {
 				advertised = d.advertiseAs[i]
@@ -166,7 +171,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return fmt.Errorf("no models to advertise")
 	}
 
-	// Register with PUT /nodes/{node_id}
+	// Register with the grid server
 	payload := domain.NodeUpdateRequest{
 		Role:        domain.RoleEngine,
 		Models:      allModels,
@@ -176,7 +181,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		Upstream:    upstream,
 	}
 
-	if err := d.register(ctx, payload); err != nil {
+	if err := d.gridClient.Register(ctx, d.nodeID, payload); err != nil {
 		return fmt.Errorf("registration failed: %w", err)
 	}
 	d.logger.Info("registered with grid",
@@ -186,75 +191,39 @@ func (d *Daemon) Run(ctx context.Context) error {
 		"endpoint", primaryEndpoint,
 	)
 
-	// Heartbeat loop — re-probes models each tick so the grid stays fresh
-	ticker := time.NewTicker(d.interval)
-	defer ticker.Stop()
+	// Heartbeat loop (fast) + model poll (slow)
+	heartbeatTicker := time.NewTicker(d.interval)
+	defer heartbeatTicker.Stop()
+	pollTicker := time.NewTicker(d.pollInterval)
+	defer pollTicker.Stop()
+
+	d.logger.Info("heartbeat every", "interval", d.interval, "model_poll_every", d.pollInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
 			d.deregister()
 			return nil
-		case <-ticker.C:
-			// Re-probe models from the provider
+		case <-heartbeatTicker.C:
+			if err := d.heartbeat(ctx, payload); err != nil {
+				d.logger.Warn("heartbeat failed", "err", err)
+			}
+		case <-pollTicker.C:
 			freshModels := d.probeCurrentModels(ctx)
 			if freshModels != nil && !slicesEqual(freshModels, payload.Models) {
 				payload.Models = freshModels
-				// Rebuild upstream map
-				upstream := map[string]string{}
+				newUpstream := map[string]string{}
 				for _, m := range freshModels {
-					upstream[m] = m
+					newUpstream[m] = m
 				}
-				payload.Upstream = upstream
+				payload.Upstream = newUpstream
 				d.logger.Info("model list changed, re-registering", "models", freshModels)
-				if err := d.register(ctx, payload); err != nil {
+				if err := d.gridClient.Register(ctx, d.nodeID, payload); err != nil {
 					d.logger.Warn("re-registration failed", "err", err)
-				}
-			} else {
-				if err := d.heartbeat(ctx, payload); err != nil {
-					d.logger.Warn("heartbeat failed", "err", err)
 				}
 			}
 		}
 	}
-}
-
-func (d *Daemon) waitForEndpoint(ctx context.Context, url string) error {
-	for i := 0; i < 30; i++ {
-		req, _ := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-		resp, err := d.httpClient.Do(req)
-		if err == nil {
-			resp.Body.Close()
-			return nil
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(2 * time.Second):
-		}
-	}
-	return fmt.Errorf("endpoint %s not available after 60s", url)
-}
-
-func (d *Daemon) register(ctx context.Context, payload domain.NodeUpdateRequest) error {
-	body, _ := json.Marshal(payload)
-	url := fmt.Sprintf("%s/nodes/%s", d.serverURL, d.nodeID)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, url, bytes.NewReader(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("connecting to server %s: %w", d.serverURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 400 {
-		return fmt.Errorf("registration returned %d", resp.StatusCode)
-	}
-	return nil
 }
 
 func (d *Daemon) heartbeat(ctx context.Context, registrationPayload domain.NodeUpdateRequest) error {
@@ -262,23 +231,14 @@ func (d *Daemon) heartbeat(ctx context.Context, registrationPayload domain.NodeU
 		NodeID: d.nodeID,
 		Load:   domain.Load{ActiveTasks: 0},
 	}
-	body, _ := json.Marshal(hb)
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, d.serverURL+"/nodes/heartbeat", bytes.NewReader(body))
+	err := d.gridClient.Heartbeat(ctx, hb)
 	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			d.logger.Warn("node lost on server, re-registering")
+			return d.gridClient.Register(ctx, d.nodeID, registrationPayload)
+		}
 		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := d.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotFound {
-		d.logger.Warn("node lost on server, re-registering")
-		return d.register(ctx, registrationPayload)
 	}
 	return nil
 }
@@ -286,16 +246,10 @@ func (d *Daemon) heartbeat(ctx context.Context, registrationPayload domain.NodeU
 func (d *Daemon) deregister() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	url := fmt.Sprintf("%s/nodes/%s", d.serverURL, d.nodeID)
-	req, _ := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	resp, err := d.httpClient.Do(req)
-	if err == nil {
-		resp.Body.Close()
-	}
+	_ = d.gridClient.Deregister(ctx, d.nodeID)
 	d.logger.Info("unregistered from grid")
 }
 
-// probeCurrentModels re-fetches models from the provider.
 func (d *Daemon) probeCurrentModels(ctx context.Context) []string {
 	if d.autoDetect {
 		engines, err := d.detector.Detect(ctx)
@@ -312,8 +266,7 @@ func (d *Daemon) probeCurrentModels(ctx context.Context) []string {
 	}
 
 	if d.ollamaURL != "" {
-		adapter := NewOllamaAdapter(d.ollamaURL)
-		models, err := adapter.ListModels(ctx)
+		models, err := d.ollama.ListModels(ctx)
 		if err != nil {
 			return nil
 		}
