@@ -186,7 +186,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		"endpoint", primaryEndpoint,
 	)
 
-	// Heartbeat loop
+	// Heartbeat loop — re-probes models each tick so the grid stays fresh
 	ticker := time.NewTicker(d.interval)
 	defer ticker.Stop()
 
@@ -196,8 +196,24 @@ func (d *Daemon) Run(ctx context.Context) error {
 			d.deregister()
 			return nil
 		case <-ticker.C:
-			if err := d.heartbeat(ctx, payload); err != nil {
-				d.logger.Warn("heartbeat failed", "err", err)
+			// Re-probe models from the provider
+			freshModels := d.probeCurrentModels(ctx)
+			if freshModels != nil && !slicesEqual(freshModels, payload.Models) {
+				payload.Models = freshModels
+				// Rebuild upstream map
+				upstream := map[string]string{}
+				for _, m := range freshModels {
+					upstream[m] = m
+				}
+				payload.Upstream = upstream
+				d.logger.Info("model list changed, re-registering", "models", freshModels)
+				if err := d.register(ctx, payload); err != nil {
+					d.logger.Warn("re-registration failed", "err", err)
+				}
+			} else {
+				if err := d.heartbeat(ctx, payload); err != nil {
+					d.logger.Warn("heartbeat failed", "err", err)
+				}
 			}
 		}
 	}
@@ -277,4 +293,52 @@ func (d *Daemon) deregister() {
 		resp.Body.Close()
 	}
 	d.logger.Info("unregistered from grid")
+}
+
+// probeCurrentModels re-fetches models from the provider.
+func (d *Daemon) probeCurrentModels(ctx context.Context) []string {
+	if d.autoDetect {
+		engines, err := d.detector.Detect(ctx)
+		if err != nil || len(engines) == 0 {
+			return nil
+		}
+		var all []string
+		for _, e := range engines {
+			if !e.Media {
+				all = append(all, e.Models...)
+			}
+		}
+		return all
+	}
+
+	if d.ollamaURL != "" {
+		adapter := NewOllamaAdapter(d.ollamaURL)
+		models, err := adapter.ListModels(ctx)
+		if err != nil {
+			return nil
+		}
+		names := make([]string, 0, len(models))
+		for _, m := range models {
+			names = append(names, m.Name)
+		}
+		return names
+	}
+
+	return nil
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	set := make(map[string]struct{}, len(a))
+	for _, v := range a {
+		set[v] = struct{}{}
+	}
+	for _, v := range b {
+		if _, ok := set[v]; !ok {
+			return false
+		}
+	}
+	return true
 }

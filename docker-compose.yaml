@@ -1,0 +1,52 @@
+services:
+  # Beagrid server — the central grid endpoint
+  server:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.server
+    ports:
+      - "8090:8090"
+    command:
+      - --port=8090
+      - --name=home
+      - --node-ttl=60
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8090/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Ollama instance (simulates a GPU node)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Uncomment for GPU passthrough:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # Beagrid agent — discovers Ollama and registers with server
+  agent:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.agent
+    command:
+      - --server=http://server:8090
+      - --ollama=http://ollama:11434
+      - --name=ollama-node
+      - --heartbeat-interval=10
+    depends_on:
+      server:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+volumes:
+  ollama_data:
