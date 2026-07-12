@@ -133,7 +133,7 @@
         <button class="active" onclick="switchTab('engines')">Engines</button>
         <button onclick="switchTab('topology')">Topology</button>
         <button onclick="switchTab('models')">Models</button>
-        <button onclick="switchTab('stats')">Statistics</button>
+        <button onclick="switchTab('stats')">About</button>
     </nav>
 
     <!-- Tab: Engines -->
@@ -156,27 +156,46 @@
         </div>
     </div>
 
-    <!-- Tab: Statistics -->
+    <!-- Tab: About -->
     <div class="tab-content" id="tab-stats">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
             <div class="stat-card" style="text-align:left">
-                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Model Distribution</h4>
-                <div id="stats-model-chart"></div>
+                <h4 style="font-size:.9rem;margin-bottom:1rem;color:var(--accent)">Grid</h4>
+                <div id="about-grid"></div>
             </div>
             <div class="stat-card" style="text-align:left">
-                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Engine Load</h4>
-                <div id="stats-load-chart"></div>
+                <h4 style="font-size:.9rem;margin-bottom:1rem;color:var(--accent)">Usage</h4>
+                <p style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Point any OpenAI-compatible client at this grid:</p>
+                <pre style="background:var(--surface-2);padding:.75rem;border-radius:6px;font-size:.7rem;overflow-x:auto;color:var(--text)"><code id="about-env"></code></pre>
+                <p style="font-size:.75rem;color:var(--text-dim);margin-top:.75rem">Python:</p>
+                <pre style="background:var(--surface-2);padding:.75rem;border-radius:6px;font-size:.7rem;overflow-x:auto;color:var(--text)"><code>from openai import OpenAI
+client = OpenAI(
+    base_url="<span id="about-url"></span>",
+    api_key="local-grid"
+)
+client.chat.completions.create(
+    model="your-model",
+    messages=[{"role": "user", "content": "hi"}]
+)</code></pre>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
-            <div class="stat-card" style="text-align:left">
-                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Engines Online (last 60 samples)</h4>
-                <div id="stats-timeline" style="display:flex;align-items:flex-end;gap:2px;height:80px"></div>
-            </div>
-            <div class="stat-card" style="text-align:left">
-                <h4 style="font-size:.8rem;color:var(--text-dim);margin-bottom:.75rem">Grid Info</h4>
-                <div id="stats-grid-info"></div>
-            </div>
+        <div class="stat-card" style="text-align:left;margin-top:1rem">
+            <h4 style="font-size:.9rem;margin-bottom:.75rem;color:var(--accent)">About Beagrid</h4>
+            <p style="font-size:.8rem;color:var(--text-dim);line-height:1.6">
+                Beagrid is a free, open-source inference grid that pools your local AI engines
+                (Ollama, vLLM, LM Studio, MLX, llama.cpp) behind one OpenAI-compatible endpoint.
+                Requests are routed to the least-loaded engine automatically.
+            </p>
+            <p style="font-size:.8rem;color:var(--text-dim);line-height:1.6;margin-top:.5rem">
+                No accounts. No cloud. No relay. Just your hardware, connected.
+            </p>
+            <p style="font-size:.75rem;margin-top:1rem">
+                <a href="https://github.com/rafaribe/beagrid" target="_blank" style="color:var(--accent);text-decoration:none">GitHub</a>
+                <span style="color:var(--border);margin:0 .5rem">·</span>
+                <span style="color:var(--text-dim)">MIT License</span>
+                <span style="color:var(--border);margin:0 .5rem">·</span>
+                <span style="color:var(--text-dim)" id="about-version"></span>
+            </p>
         </div>
     </div>
 </main>
@@ -289,32 +308,21 @@ function updateModels(nodes) {
     }).join('');
 }
 
-// --- Statistics Tab ---
-let heartbeatHistory = [];
+// --- About Tab ---
 function updateStatsTab(info, nodes, ver) {
-    heartbeatHistory.push(nodes.length);
-    if (heartbeatHistory.length > 60) heartbeatHistory.shift();
-    const maxH = Math.max(...heartbeatHistory, 1);
-    document.getElementById('stats-timeline').innerHTML = heartbeatHistory
-        .map(v => `<div style="flex:1;min-width:3px;height:${Math.max((v/maxH)*100,5)}%;background:var(--accent);border-radius:2px 2px 0 0;opacity:.7;transition:height .3s" title="${v} engines"></div>`).join('');
-
-    const modelCount = {};
-    nodes.forEach(n => (n.models||[]).forEach(m => { modelCount[m]=(modelCount[m]||0)+1; }));
-    const maxM = Math.max(...Object.values(modelCount), 1);
-    document.getElementById('stats-model-chart').innerHTML = Object.entries(modelCount).sort((a,b)=>b[1]-a[1]).slice(0,8)
-        .map(([m,c]) => `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><span style="font-size:.7rem;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:monospace;color:var(--text-dim)" title="${esc(m)}">${esc(m)}</span><div style="flex:1;height:18px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${(c/maxM)*100}%;background:var(--accent);border-radius:3px;transition:width .5s;display:flex;align-items:center;padding-left:.3rem"><span style="font-size:.6rem;color:white;font-weight:600">${c}</span></div></div></div>`).join('') || '<div style="color:var(--text-dim);font-size:.8rem">No data</div>';
-
-    const maxL = Math.max(...nodes.map(n=>n.load?.active_tasks||0), 1);
-    document.getElementById('stats-load-chart').innerHTML = nodes.map(n => {
-        const load = n.load?.active_tasks||0;
-        const color = load>3?'var(--yellow)':load>0?'var(--accent)':'var(--green)';
-        return `<div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem"><span style="font-size:.7rem;min-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-dim)">${esc((n.name||'?').slice(0,12))}</span><div style="flex:1;height:18px;background:var(--surface-2);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.max((load/maxL)*100,8)}%;background:${color};border-radius:3px;transition:width .5s;display:flex;align-items:center;padding-left:.3rem"><span style="font-size:.6rem;color:white;font-weight:600">${load}</span></div></div></div>`;
-    }).join('') || '<div style="color:var(--text-dim);font-size:.8rem">No engines</div>';
-
-    document.getElementById('stats-grid-info').innerHTML = [
-        ['Grid ID',`<span style="font-family:monospace;font-size:.7rem">${info.grid_id}</span>`],
-        ['Name',info.name],['Type',info.grid_type],['Node TTL',info.node_ttl_seconds+'s'],['Version',ver.version],['Uptime',ver.uptime||'-']
-    ].map(([k,v])=>`<div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">${k}</span><span>${v}</span></div>`).join('');
+    const baseUrl = window.location.origin + '/v1';
+    document.getElementById('about-env').textContent = `export OPENAI_BASE_URL="${baseUrl}"\nexport OPENAI_API_KEY="local-grid"`;
+    document.getElementById('about-url').textContent = baseUrl;
+    document.getElementById('about-version').textContent = 'v' + (ver.version || 'dev');
+    document.getElementById('about-grid').innerHTML = [
+        ['Grid ID', `<span style="font-family:monospace;font-size:.7rem">${info.grid_id}</span>`],
+        ['Name', info.name],
+        ['Type', info.grid_type],
+        ['Node TTL', info.node_ttl_seconds + 's'],
+        ['Engines Online', info.engines_online],
+        ['Version', ver.version],
+        ['Uptime', ver.uptime || '-'],
+    ].map(([k,v]) => `<div style="display:flex;justify-content:space-between;padding:.4rem 0;border-bottom:1px solid var(--border);font-size:.8rem"><span style="color:var(--text-dim)">${k}</span><span>${v}</span></div>`).join('');
 }
 
 function timeAgo(ts) { if(!ts)return'-'; const d=(Date.now()-new Date(ts).getTime())/1000; return d<60?Math.round(d)+'s':d<3600?Math.round(d/60)+'m':Math.round(d/3600)+'h'; }
