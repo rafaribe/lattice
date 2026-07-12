@@ -13,6 +13,11 @@
         [data-theme="catppuccin-frappe"]{--bg:#303446;--surface:#292c3c;--surface-2:#414559;--border:#51576d;--text:#c6d0f5;--text-dim:#a5adce;--accent:#ca9ee6;--accent-glow:rgba(202,158,230,0.25);--green:#a6d189;--red:#e78284;--yellow:#e5c890}
         [data-theme="catppuccin-macchiato"]{--bg:#24273a;--surface:#1e2030;--surface-2:#363a4f;--border:#494d64;--text:#cad3f5;--text-dim:#a5adcb;--accent:#c6a0f6;--accent-glow:rgba(198,160,246,0.25);--green:#a6da95;--red:#ed8796;--yellow:#eed49f}
         [data-theme="catppuccin-mocha"]{--bg:#1e1e2e;--surface:#181825;--surface-2:#313244;--border:#45475a;--text:#cdd6f4;--text-dim:#a6adc8;--accent:#cba6f7;--accent-glow:rgba(203,166,247,0.25);--green:#a6e3a1;--red:#f38ba8;--yellow:#f9e2af}
+        [data-theme="github-dark"]{--bg:#0d1117;--surface:#161b22;--surface-2:#21262d;--border:#30363d;--text:#e6edf3;--text-dim:#8b949e;--accent:#58a6ff;--accent-glow:rgba(88,166,255,0.25);--green:#3fb950;--red:#f85149;--yellow:#d29922;--radius:6px}
+        [data-theme="github-light"]{--bg:#ffffff;--surface:#f6f8fa;--surface-2:#eaeef2;--border:#d0d7de;--text:#1f2328;--text-dim:#656d76;--accent:#0969da;--accent-glow:rgba(9,105,218,0.12);--green:#1a7f37;--red:#cf222e;--yellow:#9a6700;--radius:6px}
+        [data-theme="solarized-dark"]{--bg:#002b36;--surface:#073642;--surface-2:#0a4050;--border:#2aa198;--text:#fdf6e3;--text-dim:#93a1a1;--accent:#268bd2;--accent-glow:rgba(38,139,210,0.25);--green:#859900;--red:#dc322f;--yellow:#b58900;--radius:8px}
+        [data-theme="tokyo-night"]{--bg:#1a1b26;--surface:#24283b;--surface-2:#292e42;--border:#3b4261;--text:#c0caf5;--text-dim:#565f89;--accent:#7aa2f7;--accent-glow:rgba(122,162,247,0.25);--green:#9ece6a;--red:#f7768e;--yellow:#e0af68;--radius:10px}
+        [data-theme="gruvbox"]{--bg:#282828;--surface:#3c3836;--surface-2:#504945;--border:#665c54;--text:#ebdbb2;--text-dim:#a89984;--accent:#fe8019;--accent-glow:rgba(254,128,25,0.25);--green:#b8bb26;--red:#fb4934;--yellow:#fabd2f;--radius:8px}
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;transition:background .3s,color .3s}
         header{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
@@ -110,6 +115,11 @@
                 <div class="theme-option" data-theme="catppuccin-frappe" onclick="setTheme('catppuccin-frappe')"><div class="theme-swatch" style="background:linear-gradient(135deg,#303446,#ca9ee6)"></div>Frappé</div>
                 <div class="theme-option" data-theme="catppuccin-macchiato" onclick="setTheme('catppuccin-macchiato')"><div class="theme-swatch" style="background:linear-gradient(135deg,#24273a,#c6a0f6)"></div>Macchiato</div>
                 <div class="theme-option" data-theme="catppuccin-mocha" onclick="setTheme('catppuccin-mocha')"><div class="theme-swatch" style="background:linear-gradient(135deg,#1e1e2e,#cba6f7)"></div>Mocha</div>
+                <div class="theme-option" data-theme="github-dark" onclick="setTheme('github-dark')"><div class="theme-swatch" style="background:linear-gradient(135deg,#0d1117,#58a6ff)"></div>GitHub Dark</div>
+                <div class="theme-option" data-theme="github-light" onclick="setTheme('github-light')"><div class="theme-swatch" style="background:linear-gradient(135deg,#ffffff,#0969da)"></div>GitHub Light</div>
+                <div class="theme-option" data-theme="solarized-dark" onclick="setTheme('solarized-dark')"><div class="theme-swatch" style="background:linear-gradient(135deg,#002b36,#268bd2)"></div>Solarized</div>
+                <div class="theme-option" data-theme="tokyo-night" onclick="setTheme('tokyo-night')"><div class="theme-swatch" style="background:linear-gradient(135deg,#1a1b26,#7aa2f7)"></div>Tokyo Night</div>
+                <div class="theme-option" data-theme="gruvbox" onclick="setTheme('gruvbox')"><div class="theme-swatch" style="background:linear-gradient(135deg,#282828,#fe8019)"></div>Gruvbox</div>
             </div>
         </div>
         <div class="settings-group"><label>Refresh interval</label>
