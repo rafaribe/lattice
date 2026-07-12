@@ -54,6 +54,7 @@ jobs:
             VERSION="${VERSION#v}"
           else
             VERSION=$(svu next 2>/dev/null || echo "0.1.0")
+            VERSION="${VERSION#v}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
@@ -118,6 +119,7 @@ jobs:
             VERSION="${VERSION#v}"
           else
             VERSION=$(svu next 2>/dev/null || echo "0.1.0")
+            VERSION="${VERSION#v}"
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
