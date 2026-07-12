@@ -7,20 +7,32 @@ import "time"
 
 // Node represents a compute node in the grid.
 type Node struct {
-	NodeID       string         `json:"node_id"`
-	Role         Role           `json:"role"`           // engine, app, both
-	Name         string         `json:"name,omitempty"`
-	Models       []string       `json:"models"`         // model names this node advertises
-	EndpointURL  string         `json:"endpoint_url,omitempty"` // OpenAI-compatible URL for text inference
-	MediaURL     string         `json:"media_url,omitempty"`    // URL for media generation
-	Pricing      map[string]any `json:"pricing,omitempty"`
-	Capabilities map[string]any `json:"capabilities,omitempty"`
-	Load         Load           `json:"load"`
-	Upstream     map[string]string `json:"upstream,omitempty"` // advertised_name → engine's real model name
-	FirstSeenAt  string         `json:"first_seen_at"`
-	LastHeartbeat time.Time     `json:"last_heartbeat"`
-	TTLSeconds   int            `json:"ttl_seconds"`
+	NodeID        string            `json:"node_id"`
+	Role          Role              `json:"role"`                    // engine, app, both
+	Name          string            `json:"name,omitempty"`
+	Models        []string          `json:"models"`                  // model names this node advertises
+	EndpointURL   string            `json:"endpoint_url,omitempty"`  // OpenAI-compatible URL for text inference
+	MediaURL      string            `json:"media_url,omitempty"`     // URL for media generation
+	Pricing       map[string]any    `json:"pricing,omitempty"`
+	Capabilities  map[string]any    `json:"capabilities,omitempty"`
+	Load          Load              `json:"load"`
+	Upstream      map[string]string `json:"upstream,omitempty"`      // advertised_name → engine's real model name
+	FirstSeenAt   string            `json:"first_seen_at"`
+	LastHeartbeat time.Time         `json:"last_heartbeat"`
+	TTLSeconds    int               `json:"ttl_seconds"`
+	Status        NodeStatus        `json:"status"`                  // online, degraded, offline
+	LastCheckedAt time.Time         `json:"last_checked_at,omitempty"`
+	FailCount     int               `json:"fail_count,omitempty"`    // consecutive health check failures
 }
+
+// NodeStatus represents the health state of a node.
+type NodeStatus string
+
+const (
+	StatusOnline   NodeStatus = "online"
+	StatusDegraded NodeStatus = "degraded" // 1-2 failed checks
+	StatusOffline  NodeStatus = "offline"  // 3+ failed checks
+)
 
 // Role defines what a node does in the grid.
 type Role string

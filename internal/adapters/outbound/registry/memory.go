@@ -4,7 +4,10 @@ package registry
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,14 +19,15 @@ const DefaultNodeTTL = 60 // seconds
 
 // Memory is an in-memory implementation of the application.NodeRegistry port.
 type Memory struct {
-	mu     sync.RWMutex
-	nodes  map[string]*domain.Node
-	gridID string
-	name   string
-	ttl    int // seconds
+	mu       sync.RWMutex
+	nodes    map[string]*domain.Node
+	gridID   string
+	name     string
+	ttl      int // seconds
+	client   *http.Client
 }
 
-// New creates a new in-memory registry and starts the background reaper.
+// New creates a new in-memory registry and starts the background reaper + health checker.
 func New(gridID, name string, ttl int) *Memory {
 	if ttl <= 0 {
 		ttl = DefaultNodeTTL
@@ -33,8 +37,10 @@ func New(gridID, name string, ttl int) *Memory {
 		gridID: gridID,
 		name:   name,
 		ttl:    ttl,
+		client: &http.Client{Timeout: 5 * time.Second},
 	}
 	go r.reaper()
+	go r.healthChecker()
 	return r
 }
 
@@ -60,6 +66,7 @@ func (r *Memory) Create(_ context.Context, req domain.NodeCreateRequest) (*domai
 		FirstSeenAt:   time.Now().UTC().Format(time.RFC3339),
 		LastHeartbeat: time.Now(),
 		TTLSeconds:    r.ttl,
+		Status:        domain.StatusOnline,
 	}
 	r.nodes[nodeID] = node
 	return &domain.NodeCreateResponse{NodeID: nodeID, Role: role}, nil
@@ -76,6 +83,7 @@ func (r *Memory) Update(_ context.Context, nodeID string, req domain.NodeUpdateR
 			NodeID:      nodeID,
 			FirstSeenAt: time.Now().UTC().Format(time.RFC3339),
 			TTLSeconds:  r.ttl,
+			Status:      domain.StatusOnline,
 		}
 		r.nodes[nodeID] = node
 	}
@@ -107,6 +115,8 @@ func (r *Memory) Heartbeat(_ context.Context, req domain.HeartbeatRequest) error
 	}
 	node.Load = req.Load
 	node.LastHeartbeat = time.Now()
+	node.Status = domain.StatusOnline
+	node.FailCount = 0
 	return nil
 }
 
@@ -146,6 +156,9 @@ func (r *Memory) Discover(_ context.Context, model string) ([]*domain.Node, erro
 			continue
 		}
 		if n.Role != domain.RoleEngine && n.Role != domain.RoleBoth {
+			continue
+		}
+		if n.Status == domain.StatusOffline {
 			continue
 		}
 		if model != "" {
@@ -216,6 +229,72 @@ func (r *Memory) reaper() {
 		}
 		r.mu.Unlock()
 	}
+}
+
+// healthChecker actively probes engine endpoints to detect failures.
+// Runs every 30s. Updates node status based on reachability.
+func (r *Memory) healthChecker() {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+	for range ticker.C {
+		r.mu.RLock()
+		nodes := make([]*domain.Node, 0, len(r.nodes))
+		for _, n := range r.nodes {
+			if n.EndpointURL != "" || n.MediaURL != "" {
+				nodes = append(nodes, n)
+			}
+		}
+		r.mu.RUnlock()
+
+		for _, n := range nodes {
+			alive := r.probeEngine(n)
+			r.mu.Lock()
+			// Node might have been deleted while we were probing
+			if current, ok := r.nodes[n.NodeID]; ok {
+				current.LastCheckedAt = time.Now()
+				if alive {
+					current.FailCount = 0
+					current.Status = domain.StatusOnline
+				} else {
+					current.FailCount++
+					switch {
+					case current.FailCount >= 3:
+						current.Status = domain.StatusOffline
+					case current.FailCount >= 1:
+						current.Status = domain.StatusDegraded
+					}
+					slog.Default().Warn("engine health check failed",
+						"node_id", current.NodeID,
+						"name", current.Name,
+						"endpoint", current.EndpointURL,
+						"fail_count", current.FailCount,
+						"status", current.Status,
+					)
+				}
+			}
+			r.mu.Unlock()
+		}
+	}
+}
+
+// probeEngine checks if an engine is reachable by hitting its models endpoint.
+func (r *Memory) probeEngine(n *domain.Node) bool {
+	url := n.EndpointURL
+	if url == "" {
+		url = n.MediaURL
+	}
+	// Try /models (OpenAI-compatible) or just a GET on the base
+	probeURL := strings.TrimSuffix(url, "/v1") + "/v1/models"
+	req, err := http.NewRequest(http.MethodGet, probeURL, nil)
+	if err != nil {
+		return false
+	}
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode < 500
 }
 
 func dedup(items []string) []string {
