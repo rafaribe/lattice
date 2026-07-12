@@ -1,0 +1,87 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./... -race -count=1
+
+builds:
+  - id: beagrid
+    main: ./cmd/beagrid
+    binary: beagrid
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: beagrid-server
+    main: ./cmd/server
+    binary: beagrid-server
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+  - id: beagrid-agent
+    main: ./cmd/agent
+    binary: beagrid-agent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: beagrid
+    builds:
+      - beagrid
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+  - id: server-agent
+    builds:
+      - beagrid-server
+      - beagrid-agent
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}-server_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^chore:"
+      - "^docs:"
+      - "^ci:"
+
+release:
+  github:
+    owner: rafaribe
+    name: beagrid
+  prerelease: auto
+  name_template: "{{.Tag}}"
