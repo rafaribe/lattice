@@ -32,4 +32,7 @@ Thumbs.db
 
 # mise
 .mise.local.toml
+
+# Session context
+.context/
 server
