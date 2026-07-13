@@ -32,31 +32,6 @@ No accounts. No paid features. No relay services. Just your hardware, connected.
         └─────────────────┘   └──────────────────┘
 ```
 
-## Features (autonomous-grid parity)
-
-| Feature | Status |
-|---------|--------|
-| OpenAI-compatible `/v1/chat/completions` | ✅ |
-| OpenAI-compatible `/v1/completions` | ✅ |
-| `/v1/models` listing | ✅ |
-| `/nodes/discover` engine discovery | ✅ |
-| `/grid/info` endpoint | ✅ |
-| Node TTL-based reaping | ✅ |
-| Load-based routing (active_tasks) | ✅ |
-| Model aliasing (`--advertise-as` / upstream) | ✅ |
-| Roles: engine, app, both | ✅ |
-| PUT /nodes/{id} auto-create | ✅ |
-| Multi-engine auto-detection (Ollama, vLLM, LM Studio, MLX, llama.cpp, ComfyUI) | ✅ |
-| Media endpoints (image/generate, image/edit, video/i2v) | ✅ |
-| Proper OpenAI error format | ✅ |
-| Streaming support (SSE passthrough) | ✅ |
-| CLI: `up`, `down`, `ls`, `info`, `use`, `join`, `leave`, `models`, `engines`, `chat`, `version` | ✅ |
-| Web dashboard with topology visualization | ✅ |
-| Kubernetes manifests (server + agent DaemonSet) | ✅ |
-| Heartbeat + auto-re-registration | ✅ |
-| Single static Go binaries (zero runtime dependencies) | ✅ |
-| Docker images (multi-stage, <20MB) | ✅ |
-
 ## Quickstart
 
 ### Build
