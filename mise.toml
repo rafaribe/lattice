@@ -3,27 +3,27 @@ go = "1.26"
 golangci-lint = "latest"
 
 [env]
-BEAGRID_PORT = "8090"
-BEAGRID_NAME = "home"
+LATTICE_PORT = "8090"
+LATTICE_NAME = "home"
 CGO_ENABLED = "0"
 
 # ---------- Build ----------
 
 [tasks.build]
 description = "Build all binaries"
-run = "go build -ldflags='-s -w' -o bin/beagrid-server ./cmd/server && go build -ldflags='-s -w' -o bin/beagrid-agent ./cmd/agent && go build -ldflags='-s -w' -o bin/beagrid ./cmd/beagrid"
+run = "go build -ldflags='-s -w' -o bin/lattice-server ./cmd/server && go build -ldflags='-s -w' -o bin/lattice-agent ./cmd/agent && go build -ldflags='-s -w' -o bin/lattice ./cmd/lattice"
 
 [tasks."build:server"]
 description = "Build server binary"
-run = "go build -ldflags='-s -w' -o bin/beagrid-server ./cmd/server"
+run = "go build -ldflags='-s -w' -o bin/lattice-server ./cmd/server"
 
 [tasks."build:agent"]
 description = "Build agent binary"
-run = "go build -ldflags='-s -w' -o bin/beagrid-agent ./cmd/agent"
+run = "go build -ldflags='-s -w' -o bin/lattice-agent ./cmd/agent"
 
 [tasks."build:cli"]
 description = "Build CLI binary"
-run = "go build -ldflags='-s -w' -o bin/beagrid ./cmd/beagrid"
+run = "go build -ldflags='-s -w' -o bin/lattice ./cmd/lattice"
 
 # ---------- Test ----------
 
@@ -72,11 +72,11 @@ run = "go vet ./..."
 
 [tasks.run]
 description = "Run server locally"
-run = "go run ./cmd/server --port ${BEAGRID_PORT} --name ${BEAGRID_NAME}"
+run = "go run ./cmd/server --port ${LATTICE_PORT} --name ${LATTICE_NAME}"
 
 [tasks."run:agent"]
 description = "Run agent pointing at local server and Ollama"
-run = "go run ./cmd/agent --server http://localhost:${BEAGRID_PORT} --ollama http://localhost:11434"
+run = "go run ./cmd/agent --server http://localhost:${LATTICE_PORT} --ollama http://localhost:11434"
 
 # ---------- Docker ----------
 

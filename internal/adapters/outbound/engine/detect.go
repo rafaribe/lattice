@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
 // engineProbe defines how to detect an inference engine.

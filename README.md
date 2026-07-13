@@ -1,8 +1,8 @@
-# ⚡ Beagrid
+# ⚡ Lattice
 
 **A free, open-source inference grid that pools your Ollama/vLLM/LM Studio/MLX/llama.cpp nodes behind one endpoint.**
 
-Beagrid connects machines running inference engines into a unified grid. A central server (designed for Kubernetes) accepts OpenAI-compatible requests and routes them to the least-loaded available engine. Agents auto-detect local inference servers and register them with the grid.
+Lattice connects machines running inference engines into a unified grid. A central server (designed for Kubernetes) accepts OpenAI-compatible requests and routes them to the least-loaded available engine. Agents auto-detect local inference servers and register them with the grid.
 
 No accounts. No paid features. No relay services. Just your hardware, connected.
 
@@ -10,7 +10,7 @@ No accounts. No paid features. No relay services. Just your hardware, connected.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
-│                  Beagrid Server (K8s)                        │
+│                  Lattice Server (K8s)                        │
 │                                                              │
 │  ┌────────┐  ┌──────────┐  ┌──────────┐  ┌─────────────┐  │
 │  │ Web UI │  │ Registry │  │ Router   │  │ OpenAI API  │  │
@@ -63,39 +63,39 @@ No accounts. No paid features. No relay services. Just your hardware, connected.
 
 ```bash
 make build
-# Produces: bin/beagrid-server, bin/beagrid-agent, bin/beagrid
+# Produces: bin/lattice-server, bin/lattice-agent, bin/lattice
 ```
 
 ### Run Server
 
 ```bash
-./bin/beagrid-server --port 8090 --name home
+./bin/lattice-server --port 8090 --name home
 ```
 
 ### Join Engines
 
 ```bash
 # Auto-detect all running inference engines on this machine
-./bin/beagrid-agent --server http://your-server:8090 --all
+./bin/lattice-agent --server http://your-server:8090 --all
 
 # Or join a specific Ollama
-./bin/beagrid-agent --server http://your-server:8090 --ollama http://localhost:11434
+./bin/lattice-agent --server http://your-server:8090 --ollama http://localhost:11434
 
 # Or use the CLI
-./bin/beagrid join --at http://localhost:11434/v1 -m llama3.2:latest --name my-gpu
+./bin/lattice join --at http://localhost:11434/v1 -m llama3.2:latest --name my-gpu
 ```
 
 ### Use the Grid
 
 ```bash
 # List models
-./bin/beagrid models --verbose
+./bin/lattice models --verbose
 
 # Chat
-./bin/beagrid chat -m llama3.2:latest "hello from the grid"
+./bin/lattice chat -m llama3.2:latest "hello from the grid"
 
 # Info
-./bin/beagrid info --env
+./bin/lattice info --env
 # export OPENAI_BASE_URL="http://192.168.1.10:8090/v1"
 # export OPENAI_API_KEY="local-grid"
 ```
@@ -104,7 +104,7 @@ make build
 
 ```python
 from openai import OpenAI
-client = OpenAI(base_url="http://beagrid:8090/v1", api_key="local-grid")
+client = OpenAI(base_url="http://lattice:8090/v1", api_key="local-grid")
 client.chat.completions.create(
     model="llama3.2:latest",
     messages=[{"role": "user", "content": "hello"}],
@@ -135,18 +135,18 @@ client.chat.completions.create(
 
 | Command | Description |
 |---------|-------------|
-| `beagrid up [name]` | Bring a grid online |
-| `beagrid down [name]` | Take a grid offline |
-| `beagrid ls` | List grids |
-| `beagrid info [--env] [--json]` | Show grid info or export env vars |
-| `beagrid use <name>` | Set the active grid |
-| `beagrid join [grid] --at <url> -m <model>` | Join an engine to the grid |
-| `beagrid join [grid] --all` | Join all detected local engines |
-| `beagrid leave [grid]` | Leave and unregister |
-| `beagrid models [--verbose] [--json]` | List live models |
-| `beagrid engines [--json]` | List live engines |
-| `beagrid chat -m <model> <message>` | Send a chat message |
-| `beagrid version` | Print version |
+| `lattice up [name]` | Bring a grid online |
+| `lattice down [name]` | Take a grid offline |
+| `lattice ls` | List grids |
+| `lattice info [--env] [--json]` | Show grid info or export env vars |
+| `lattice use <name>` | Set the active grid |
+| `lattice join [grid] --at <url> -m <model>` | Join an engine to the grid |
+| `lattice join [grid] --all` | Join all detected local engines |
+| `lattice leave [grid]` | Leave and unregister |
+| `lattice models [--verbose] [--json]` | List live models |
+| `lattice engines [--json]` | List live engines |
+| `lattice chat -m <model> <message>` | Send a chat message |
+| `lattice version` | Print version |
 
 ## Routing Algorithm
 
@@ -171,7 +171,7 @@ The agent probes well-known local ports in priority order:
 
 ```bash
 kubectl apply -f deploy/k8s/server.yaml
-kubectl label node gpu-node-1 beagrid.io/ollama=true
+kubectl label node gpu-node-1 lattice.io/ollama=true
 kubectl apply -f deploy/k8s/agent.yaml
 ```
 

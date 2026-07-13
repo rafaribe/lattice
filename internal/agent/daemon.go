@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rafaribe/beagrid/internal/application"
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/application"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
-// Daemon is the agent that registers engines with the beagrid server.
+// Daemon is the agent that registers engines with the lattice server.
 // It orchestrates detection, registration, and heartbeat via injected ports.
 type Daemon struct {
 	serverURL    string

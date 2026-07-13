@@ -1,4 +1,4 @@
-// Package domain defines the core types for the beagrid inference grid.
+// Package domain defines the core types for the lattice inference grid.
 // Mirrors autonomous-grid's data model: nodes with roles, model aliasing (upstream),
 // load tracking, capabilities, TTL-based reaping.
 package domain
@@ -137,7 +137,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-// GridConfig represents a persisted grid configuration (stored in ~/.beagrid/grids/<id>/config.json).
+// GridConfig represents a persisted grid configuration (stored in ~/.lattice/grids/<id>/config.json).
 type GridConfig struct {
 	GridID         string `json:"grid_id"`
 	Name           string `json:"name"`
@@ -150,7 +150,7 @@ type GridConfig struct {
 	UpdatedAt      string `json:"updated_at"`
 }
 
-// GridState is the global state file (~/.beagrid/state.json).
+// GridState is the global state file (~/.lattice/state.json).
 type GridState struct {
 	ActiveGrid string `json:"active_grid,omitempty"`
 }

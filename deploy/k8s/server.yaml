@@ -1,25 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: beagrid-server
+  name: lattice-server
   labels:
-    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/name: lattice
     app.kubernetes.io/component: server
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: beagrid
+      app.kubernetes.io/name: lattice
       app.kubernetes.io/component: server
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: beagrid
+        app.kubernetes.io/name: lattice
         app.kubernetes.io/component: server
     spec:
       containers:
         - name: server
-          image: ghcr.io/rafaribe/beagrid-server:latest
+          image: ghcr.io/rafaribe/lattice-server:latest
           ports:
             - containerPort: 8080
               name: http
@@ -49,14 +49,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: beagrid-server
+  name: lattice-server
   labels:
-    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/name: lattice
     app.kubernetes.io/component: server
 spec:
   type: ClusterIP
   selector:
-    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/name: lattice
     app.kubernetes.io/component: server
   ports:
     - port: 80

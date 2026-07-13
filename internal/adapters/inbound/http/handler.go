@@ -1,4 +1,4 @@
-// Package http provides the inbound HTTP adapter for the beagrid server.
+// Package http provides the inbound HTTP adapter for the lattice server.
 package http
 
 import (
@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/metrics"
-	"github.com/rafaribe/beagrid/internal/application"
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/metrics"
+	"github.com/rafaribe/lattice/internal/application"
+	"github.com/rafaribe/lattice/internal/domain"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
@@ -23,7 +23,7 @@ const (
 	maxBodyCompletions = 10 << 20 // 10 MB for completions (multi-turn)
 )
 
-// Handler provides all HTTP endpoints for the beagrid server.
+// Handler provides all HTTP endpoints for the lattice server.
 type Handler struct {
 	registry application.NodeRegistry
 	proxy    application.EngineProxy

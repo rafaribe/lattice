@@ -10,14 +10,14 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rafaribe/beagrid/internal/agent"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
+	"github.com/rafaribe/lattice/internal/agent"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/engine"
 )
 
 var version = "dev"
 
 func main() {
-	serverURL := flag.String("server", "http://localhost:8090", "Beagrid server URL")
+	serverURL := flag.String("server", "http://localhost:8090", "Lattice server URL")
 	ollamaURL := flag.String("ollama", "http://localhost:11434", "Ollama instance URL")
 	name := flag.String("name", "", "Engine name (defaults to hostname)")
 	endpointURL := flag.String("at", "", "URL of an existing OpenAI-compatible engine")
@@ -28,12 +28,12 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("beagrid-agent %s\n", version)
+		fmt.Printf("lattice-agent %s\n", version)
 		os.Exit(0)
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
-	logger.Info("beagrid agent starting", "server", *serverURL, "version", version)
+	logger.Info("lattice agent starting", "server", *serverURL, "version", version)
 
 	// --- Composition Root: wire outbound adapters ---
 	detector := engine.NewDetector()

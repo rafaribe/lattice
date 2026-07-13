@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: beagrid-agent
+  name: lattice-agent
   labels:
-    app.kubernetes.io/name: beagrid
+    app.kubernetes.io/name: lattice
     app.kubernetes.io/component: agent
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: beagrid
+      app.kubernetes.io/name: lattice
       app.kubernetes.io/component: agent
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: beagrid
+        app.kubernetes.io/name: lattice
         app.kubernetes.io/component: agent
     spec:
       containers:
         - name: agent
-          image: ghcr.io/rafaribe/beagrid-agent:latest
+          image: ghcr.io/rafaribe/lattice-agent:latest
           args:
-            - --server=http://beagrid-server.default.svc.cluster.local
+            - --server=http://lattice-server.default.svc.cluster.local
             - --ollama=http://localhost:11434
             - --priority=10
           env:
@@ -37,7 +37,7 @@ spec:
               memory: 64Mi
       # Run only on nodes labeled with ollama
       nodeSelector:
-        beagrid.io/ollama: "true"
+        lattice.io/ollama: "true"
       tolerations:
         - key: nvidia.com/gpu
           operator: Exists

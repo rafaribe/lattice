@@ -1,4 +1,4 @@
-module github.com/rafaribe/beagrid
+module github.com/rafaribe/lattice
 
 go 1.26.4
 

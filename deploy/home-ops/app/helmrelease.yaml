@@ -2,7 +2,7 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: &app beagrid
+  name: &app lattice
 spec:
   chartRef:
     kind: OCIRepository
@@ -27,15 +27,15 @@ spec:
         seccompProfile: { type: RuntimeDefault }
 
     controllers:
-      # --- Beagrid Server ---
-      beagrid:
+      # --- Lattice Server ---
+      lattice:
         annotations:
           reloader.stakater.com/auto: "true"
         strategy: Recreate
         containers:
           app:
             image:
-              repository: ghcr.io/rafaribe/beagrid-server
+              repository: ghcr.io/rafaribe/lattice-server
               tag: latest  # pin to a specific semver tag after first release
             args:
               - --port=8090
@@ -72,17 +72,17 @@ spec:
               readOnlyRootFilesystem: true
               capabilities: { drop: ["ALL"] }
 
-      # --- Beagrid Agent (connects to Windows Ollama at 10.0.0.98) ---
+      # --- Lattice Agent (connects to Windows Ollama at 10.0.0.98) ---
       agent:
         annotations:
           reloader.stakater.com/auto: "true"
         containers:
           app:
             image:
-              repository: ghcr.io/rafaribe/beagrid-agent
+              repository: ghcr.io/rafaribe/lattice-agent
               tag: latest  # pin to a specific semver tag after first release
             args:
-              - --server=http://beagrid:8090
+              - --server=http://lattice:8090
               - --ollama=http://10.0.0.98:11434
               - --name=windows-gpu
               - --heartbeat-interval=15

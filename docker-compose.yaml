@@ -1,4 +1,4 @@
-# Beagrid — Local Development Compose
+# Lattice — Local Development Compose
 #
 # Usage:
 #   docker compose up                      # server + agent → 10.0.0.98 Ollama (default)
@@ -8,7 +8,7 @@
 # The server UI is at http://localhost:8099/ui/
 
 services:
-  # Beagrid server — the central grid endpoint
+  # Lattice server — the central grid endpoint
   server:
     build:
       context: .
@@ -26,7 +26,7 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # Beagrid agent — registers 10.0.0.98 Windows Ollama with the server (DEFAULT)
+  # Lattice agent — registers 10.0.0.98 Windows Ollama with the server (DEFAULT)
   agent:
     build:
       context: .

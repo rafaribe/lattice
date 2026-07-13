@@ -5,10 +5,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o /beagrid-server ./cmd/server
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o /lattice-server ./cmd/server
 
 FROM alpine:3.21
 RUN apk --no-cache add ca-certificates
-COPY --from=builder /beagrid-server /usr/local/bin/beagrid-server
+COPY --from=builder /lattice-server /usr/local/bin/lattice-server
 EXPOSE 8090
-ENTRYPOINT ["beagrid-server"]
+ENTRYPOINT ["lattice-server"]

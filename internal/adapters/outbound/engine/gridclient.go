@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
 // GridClient implements the application.GridServer port.
-// It communicates with the beagrid server to register/heartbeat/deregister nodes.
+// It communicates with the lattice server to register/heartbeat/deregister nodes.
 type GridClient struct {
 	serverURL string
 	client    *http.Client

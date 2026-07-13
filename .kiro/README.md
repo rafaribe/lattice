@@ -1,10 +1,10 @@
-# Beagrid — Project Context
+# Lattice — Project Context
 
 ## What is this?
 
-Beagrid is a free, open-source inference grid that pools Ollama/vLLM/LM Studio/MLX/llama.cpp nodes behind one OpenAI-compatible endpoint. A central server (designed for Kubernetes) accepts requests and routes them to the least-loaded available engine. Agents auto-detect local inference servers and register them with the grid.
+Lattice is a free, open-source inference grid that pools Ollama/vLLM/LM Studio/MLX/llama.cpp nodes behind one OpenAI-compatible endpoint. A central server (designed for Kubernetes) accepts requests and routes them to the least-loaded available engine. Agents auto-detect local inference servers and register them with the grid.
 
-**Repo**: github.com/rafaribe/beagrid
+**Repo**: github.com/rafaribe/lattice
 **Language**: Go 1.26
 **Owner**: rafaribe
 
@@ -40,7 +40,7 @@ cmd/
   server/main.go                    # Composition root: registry + proxy → handler
   server/web/index.html             # Embedded web UI (go:embed, served at /ui/)
   agent/main.go                     # Composition root: detector + ollama + gridclient → daemon
-  beagrid/main.go                   # CLI: up, down, ls, info, join, leave, models, engines, chat
+  lattice/main.go                   # CLI: up, down, ls, info, join, leave, models, engines, chat
 ```
 
 ## Key Design Decisions
@@ -104,14 +104,14 @@ cmd/
 - No manual tagging needed — CI handles it automatically
 
 ### Container Images
-- `ghcr.io/rafaribe/beagrid-server:{version}`
-- `ghcr.io/rafaribe/beagrid-agent:{version}`
+- `ghcr.io/rafaribe/lattice-server:{version}`
+- `ghcr.io/rafaribe/lattice-agent:{version}`
 
 ## Deployment (Home-ops)
 
 ### Location in home-ops repo
 ```
-kubernetes/apps/ai/beagrid/
+kubernetes/apps/ai/lattice/
   ks.yaml                   → Flux Kustomization (targets ai namespace)
   app/
     helmrelease.yaml        → app-template HelmRelease (server + agent controllers)
@@ -119,13 +119,13 @@ kubernetes/apps/ai/beagrid/
 ```
 
 ### Architecture
-- Server: `ghcr.io/rafaribe/beagrid-server` on port 8090
-- Agent: `ghcr.io/rafaribe/beagrid-agent` → connects to `http://10.0.0.98:11434` (Windows Ollama)
-- Route: `beagrid.rafaribe.com` via envoy-internal
+- Server: `ghcr.io/rafaribe/lattice-server` on port 8090
+- Agent: `ghcr.io/rafaribe/lattice-agent` → connects to `http://10.0.0.98:11434` (Windows Ollama)
+- Route: `lattice.rafaribe.com` via envoy-internal
 - Persistence: VolSync (1Gi)
 - Monitoring: Gatus subdomain
 
-### To deploy: add `- ./beagrid/ks.yaml` to `kubernetes/apps/ai/kustomization.yaml`
+### To deploy: add `- ./lattice/ks.yaml` to `kubernetes/apps/ai/kustomization.yaml`
 
 ## Local Development
 

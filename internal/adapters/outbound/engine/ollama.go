@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rafaribe/beagrid/internal/application"
+	"github.com/rafaribe/lattice/internal/application"
 )
 
 // OllamaAdapter implements the application.OllamaClient port.

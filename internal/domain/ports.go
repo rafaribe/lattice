@@ -1,4 +1,4 @@
-// Package domain defines the core types and business rules for the beagrid inference grid.
+// Package domain defines the core types and business rules for the lattice inference grid.
 // This package has NO external dependencies — it is the innermost hexagonal layer.
 //
 // Port interfaces (NodeRegistry, EngineDetector, etc.) live in the application layer

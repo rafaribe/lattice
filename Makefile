@@ -8,13 +8,13 @@ all: build
 build: server agent cli
 
 server:
-	go build $(LDFLAGS) -o bin/beagrid-server ./cmd/server
+	go build $(LDFLAGS) -o bin/lattice-server ./cmd/server
 
 agent:
-	go build $(LDFLAGS) -o bin/beagrid-agent ./cmd/agent
+	go build $(LDFLAGS) -o bin/lattice-agent ./cmd/agent
 
 cli:
-	go build $(LDFLAGS) -o bin/beagrid ./cmd/beagrid
+	go build $(LDFLAGS) -o bin/lattice ./cmd/lattice
 
 clean:
 	rm -rf bin/
@@ -26,10 +26,10 @@ lint:
 	golangci-lint run ./...
 
 docker-server:
-	docker build -t beagrid-server:$(VERSION) -f deploy/Dockerfile.server .
+	docker build -t lattice-server:$(VERSION) -f deploy/Dockerfile.server .
 
 docker-agent:
-	docker build -t beagrid-agent:$(VERSION) -f deploy/Dockerfile.agent .
+	docker build -t lattice-agent:$(VERSION) -f deploy/Dockerfile.agent .
 
 docker: docker-server docker-agent
 

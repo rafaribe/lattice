@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
 const DefaultNodeTTL = 60 // seconds

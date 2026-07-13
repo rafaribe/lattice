@@ -6,7 +6,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
 // NodeRegistry is the outbound port for node/engine persistence and discovery.

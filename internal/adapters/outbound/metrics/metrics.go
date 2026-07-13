@@ -11,7 +11,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 )
 
-// Metrics holds OTEL meter instruments for beagrid.
+// Metrics holds OTEL meter instruments for lattice.
 type Metrics struct {
 	Meter            metric.Meter
 	RequestsTotal    metric.Int64Counter
@@ -33,27 +33,27 @@ func New() (*Metrics, http.Handler, error) {
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
 	otel.SetMeterProvider(provider)
 
-	meter := provider.Meter("beagrid")
+	meter := provider.Meter("lattice")
 
-	requestsTotal, _ := meter.Int64Counter("beagrid_http_requests_total",
+	requestsTotal, _ := meter.Int64Counter("lattice_http_requests_total",
 		metric.WithDescription("Total HTTP requests handled"),
 	)
-	requestDuration, _ := meter.Float64Histogram("beagrid_http_request_duration_seconds",
+	requestDuration, _ := meter.Float64Histogram("lattice_http_request_duration_seconds",
 		metric.WithDescription("HTTP request duration in seconds"),
 	)
-	activeEngines, _ := meter.Int64UpDownCounter("beagrid_engines_active",
+	activeEngines, _ := meter.Int64UpDownCounter("lattice_engines_active",
 		metric.WithDescription("Number of active engines in the grid"),
 	)
-	proxyRequests, _ := meter.Int64Counter("beagrid_proxy_requests_total",
+	proxyRequests, _ := meter.Int64Counter("lattice_proxy_requests_total",
 		metric.WithDescription("Total inference requests proxied to engines"),
 	)
-	proxyErrors, _ := meter.Int64Counter("beagrid_proxy_errors_total",
+	proxyErrors, _ := meter.Int64Counter("lattice_proxy_errors_total",
 		metric.WithDescription("Total proxy errors (engine unreachable, timeout)"),
 	)
-	heartbeatsTotal, _ := meter.Int64Counter("beagrid_heartbeats_total",
+	heartbeatsTotal, _ := meter.Int64Counter("lattice_heartbeats_total",
 		metric.WithDescription("Total heartbeat requests received"),
 	)
-	modelsAvailable, _ := meter.Int64Gauge("beagrid_models_available",
+	modelsAvailable, _ := meter.Int64Gauge("lattice_models_available",
 		metric.WithDescription("Number of unique models available in the grid"),
 	)
 

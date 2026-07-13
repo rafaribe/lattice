@@ -1,4 +1,4 @@
-// beagrid CLI — the unified command-line tool for managing grids, engines, and inference.
+// lattice CLI — the unified command-line tool for managing grids, engines, and inference.
 // Mirrors the command surface of autonomous-grid: up, down, ls, info, join, leave, models, engines, chat, use.
 package main
 
@@ -18,17 +18,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/rafaribe/beagrid/internal/agent"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
+	"github.com/rafaribe/lattice/internal/agent"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/engine"
 )
 
 var version = "dev"
 
 func main() {
 	root := &cobra.Command{
-		Use:   "beagrid",
-		Short: "Beagrid — pool your Ollama nodes into one inference grid",
-		Long: `Beagrid connects multiple machines running Ollama into a unified
+		Use:   "lattice",
+		Short: "Lattice — pool your Ollama nodes into one inference grid",
+		Long: `Lattice connects multiple machines running Ollama into a unified
 inference grid. One OpenAI-compatible endpoint routes requests to the
 best available node based on load and priority.`,
 		Version: version,
@@ -67,8 +67,8 @@ func cmdUp() *cobra.Command {
 			if len(args) > 0 {
 				name = args[0]
 			}
-			fmt.Printf("Starting beagrid server '%s' on %s:%d...\n", name, host, port)
-			fmt.Printf("Run: beagrid-server --name %s --port %d --host %s\n", name, port, host)
+			fmt.Printf("Starting lattice server '%s' on %s:%d...\n", name, host, port)
+			fmt.Printf("Run: lattice-server --name %s --port %d --host %s\n", name, port, host)
 			fmt.Printf("grid=%s\n", name)
 			fmt.Printf("grid_url=http://%s:%d\n", localIP(), port)
 			return nil
@@ -264,7 +264,7 @@ func cmdModels() *cobra.Command {
 			}
 			json.Unmarshal(resp, &result)
 			if len(result.Data) == 0 {
-				fmt.Println("(no live models — `beagrid join` an engine first)")
+				fmt.Println("(no live models — `lattice join` an engine first)")
 				return nil
 			}
 			if verbose {
@@ -332,7 +332,7 @@ func cmdEngines() *cobra.Command {
 			}
 			json.Unmarshal(resp, &result)
 			if len(result.Engines) == 0 {
-				fmt.Println("(no engines — `beagrid join` one first)")
+				fmt.Println("(no engines — `lattice join` one first)")
 				return nil
 			}
 			fmt.Printf("%-20s %s\n", "ENGINE", "WHERE")
@@ -410,9 +410,9 @@ func cmdChat() *cobra.Command {
 func cmdVersion() *cobra.Command {
 	return &cobra.Command{
 		Use:   "version",
-		Short: "Print the beagrid version",
+		Short: "Print the lattice version",
 		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Printf("beagrid %s\n", version)
+			fmt.Printf("lattice %s\n", version)
 		},
 	}
 }
@@ -426,7 +426,7 @@ func resolveGridURL(flag string, args []string) string {
 	if len(args) > 0 && strings.HasPrefix(args[0], "http") {
 		return strings.TrimRight(args[0], "/")
 	}
-	if env := os.Getenv("BEAGRID_URL"); env != "" {
+	if env := os.Getenv("LATTICE_URL"); env != "" {
 		return strings.TrimRight(env, "/")
 	}
 	return "http://localhost:8090"

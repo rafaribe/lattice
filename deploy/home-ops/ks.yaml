@@ -2,7 +2,7 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app beagrid
+  name: &app lattice
   namespace: flux-system
 spec:
   targetNamespace: ai
@@ -15,7 +15,7 @@ spec:
     - name: volsync
       namespace: storage
   interval: 30m
-  path: ./kubernetes/apps/ai/beagrid/app
+  path: ./kubernetes/apps/ai/lattice/app
   prune: true
   sourceRef:
     kind: GitRepository
@@ -26,7 +26,7 @@ spec:
   postBuild:
     substitute:
       APP: *app
-      GATUS_SUBDOMAIN: beagrid
+      GATUS_SUBDOMAIN: lattice
       VOLSYNC_CAPACITY: 1Gi
   components:
     - ../../../../components/volsync

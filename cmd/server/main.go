@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"os"
 
-	httpAdapter "github.com/rafaribe/beagrid/internal/adapters/inbound/http"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/engine"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/metrics"
-	"github.com/rafaribe/beagrid/internal/adapters/outbound/registry"
+	httpAdapter "github.com/rafaribe/lattice/internal/adapters/inbound/http"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/engine"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/metrics"
+	"github.com/rafaribe/lattice/internal/adapters/outbound/registry"
 )
 
 //go:embed all:web
@@ -30,7 +30,7 @@ func main() {
 	flag.Parse()
 
 	if *showVersion {
-		fmt.Printf("beagrid-server %s\n", version)
+		fmt.Printf("lattice-server %s\n", version)
 		os.Exit(0)
 	}
 
@@ -69,7 +69,7 @@ func main() {
 	wrapped := corsMiddleware(handler.MetricsMiddleware(httpAdapter.RequestIDMiddleware(mux)))
 
 	addr := fmt.Sprintf("%s:%d", *host, *port)
-	logger.Info("beagrid server starting", "addr", addr, "grid_id", gid, "name", *gridName, "node_ttl", *nodeTTL, "version", version)
+	logger.Info("lattice server starting", "addr", addr, "grid_id", gid, "name", *gridName, "node_ttl", *nodeTTL, "version", version)
 	if err := http.ListenAndServe(addr, wrapped); err != nil {
 		logger.Error("server failed", "err", err)
 		os.Exit(1)

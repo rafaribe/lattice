@@ -63,7 +63,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/beagrid-server
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/lattice-server
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.version }},suffix=-{{sha}}
@@ -127,7 +127,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/beagrid-agent
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/lattice-agent
           tags: |
             type=raw,value=${{ steps.version.outputs.version }}
             type=raw,value=${{ steps.version.outputs.version }},suffix=-{{sha}}

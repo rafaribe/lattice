@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rafaribe/beagrid/internal/domain"
+	"github.com/rafaribe/lattice/internal/domain"
 )
 
 func TestMemory_CreateAndDiscover(t *testing.T) {

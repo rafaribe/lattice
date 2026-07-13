@@ -5,9 +5,9 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o /beagrid-agent ./cmd/agent
+RUN CGO_ENABLED=0 go build -ldflags="-s -w -X main.version=${VERSION}" -o /lattice-agent ./cmd/agent
 
 FROM alpine:3.21
 RUN apk --no-cache add ca-certificates
-COPY --from=builder /beagrid-agent /usr/local/bin/beagrid-agent
-ENTRYPOINT ["beagrid-agent"]
+COPY --from=builder /lattice-agent /usr/local/bin/lattice-agent
+ENTRYPOINT ["lattice-agent"]
