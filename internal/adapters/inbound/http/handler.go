@@ -65,6 +65,9 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/chat/completions", h.handleChatCompletions)
 	mux.HandleFunc("POST /v1/completions", h.handleCompletions)
 
+	// Ollama-native API
+	h.RegisterOllamaRoutes(mux)
+
 	// Media endpoints
 	mux.HandleFunc("POST /v1/media/image/generate", h.handleMediaProxy)
 	mux.HandleFunc("POST /v1/media/image/edit", h.handleMediaProxy)
