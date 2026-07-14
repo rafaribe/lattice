@@ -150,6 +150,151 @@ kubectl label node gpu-node-1 lattice.io/ollama=true
 kubectl apply -f deploy/k8s/agent.yaml
 ```
 
+## macOS Setup
+
+Run a Lattice agent on your Mac to contribute your local inference engines (Ollama, LM Studio, MLX, etc.) to an existing grid.
+
+### Prerequisites
+
+- macOS 13+ (Apple Silicon recommended)
+- [Homebrew](https://brew.sh)
+- Go 1.22+ (for building from source)
+- A running Lattice server (self-hosted or on your cluster)
+
+### 1. Install Ollama
+
+```bash
+brew install ollama
+```
+
+Configure Ollama to listen on all interfaces so other grid nodes can reach it:
+
+```bash
+# Edit the Homebrew service plist
+brew services stop ollama
+nano $(brew --prefix)/Cellar/ollama/$(brew list --versions ollama | awk '{print $2}')/homebrew.mxcl.ollama.plist
+```
+
+Add `OLLAMA_HOST` to the `EnvironmentVariables` dict:
+
+```xml
+<key>EnvironmentVariables</key>
+<dict>
+    <key>OLLAMA_HOST</key>
+    <string>0.0.0.0</string>
+</dict>
+```
+
+Then start the service:
+
+```bash
+brew services start ollama
+```
+
+Verify it's listening on all interfaces:
+
+```bash
+lsof -nP -iTCP:11434 -sTCP:LISTEN
+# Should show: TCP *:11434 (LISTEN)
+```
+
+### 2. Build Lattice
+
+```bash
+git clone https://github.com/rafaribe/lattice.git
+cd lattice
+make build
+```
+
+Install the binaries:
+
+```bash
+cp bin/lattice-agent bin/lattice ~/.local/bin/
+# Ensure ~/.local/bin is in your PATH
+```
+
+### 3. Run the Agent
+
+```bash
+# Join all detected local engines to your grid
+lattice-agent --server https://your-lattice-server.example.com --all
+
+# Or join only Ollama
+lattice-agent --server https://your-lattice-server.example.com --ollama http://localhost:11434
+```
+
+The agent auto-detects your Mac's LAN IP and advertises it to the grid, so other nodes can route inference requests to your machine.
+
+### 4. Auto-Start on Login
+
+macOS's Local Network Privacy (macOS 15+) blocks launchd-spawned processes from accessing LAN addresses unless they have Apple Developer signing. The recommended approach is to start the agent from your shell's login config.
+
+Create a start script:
+
+```bash
+cat > ~/.local/bin/lattice-start.sh << 'SCRIPT'
+#!/bin/bash
+LOG="$HOME/.local/var/log/lattice-agent.log"
+PIDFILE="$HOME/.local/var/run/lattice-agent.pid"
+mkdir -p "$(dirname "$PIDFILE")" "$(dirname "$LOG")"
+
+if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
+    exit 0
+fi
+
+for i in $(seq 1 12); do
+    curl -s --connect-timeout 3 https://your-lattice-server.example.com/grid/info >/dev/null 2>&1 && break
+    sleep 5
+done
+
+lattice-agent --server https://your-lattice-server.example.com --all >> "$LOG" 2>&1 &
+echo $! > "$PIDFILE"
+SCRIPT
+chmod +x ~/.local/bin/lattice-start.sh
+```
+
+Then add it to your shell config:
+
+**Fish** (`~/.config/fish/conf.d/lattice-agent.fish`):
+
+```fish
+if status is-interactive
+    if not pgrep -qf "lattice-agent.*your-lattice-server"
+        ~/.local/bin/lattice-start.sh >/dev/null 2>&1 &
+        disown
+    end
+end
+```
+
+**Zsh/Bash** (`~/.zprofile` or `~/.bash_profile`):
+
+```bash
+if ! pgrep -qf "lattice-agent.*your-lattice-server"; then
+    ~/.local/bin/lattice-start.sh &>/dev/null &
+    disown
+fi
+```
+
+### 5. Verify
+
+```bash
+# Check the agent is running
+pgrep -fl lattice-agent
+
+# Check grid status
+lattice info
+
+# List models available on the grid
+lattice models --verbose
+```
+
+### macOS Notes
+
+- **Local Network Privacy**: macOS 15+ (Sequoia/Tahoe) restricts local network access for processes not launched from an interactive session. This is why we use a shell login hook instead of a launchd plist for the agent.
+- **Ollama via Homebrew**: The Homebrew launchd service for Ollama works fine because it only needs to *listen* (inbound), not make outbound LAN connections.
+- **Firewall**: If you have the macOS firewall enabled, ensure `ollama` is allowed to accept incoming connections.
+
+
 ## Configuration
 
 ### Server

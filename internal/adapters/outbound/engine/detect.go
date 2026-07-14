@@ -44,6 +44,7 @@ func NewDetector() *Detector {
 
 func (d *Detector) Detect(ctx context.Context) ([]domain.DetectedEngine, error) {
 	var found []domain.DetectedEngine
+	lanIP := DetectLocalIP()
 
 	for _, probe := range defaultProbes {
 		switch probe.Kind {
@@ -51,7 +52,7 @@ func (d *Detector) Detect(ctx context.Context) ([]domain.DetectedEngine, error) 
 			if d.isComfyUIReachable(ctx, probe.Port) {
 				found = append(found, domain.DetectedEngine{
 					Label:       probe.Label,
-					EndpointURL: fmt.Sprintf("http://127.0.0.1:%d", probe.Port),
+					EndpointURL: fmt.Sprintf("http://%s:%d", lanIP, probe.Port),
 					Models:      []string{},
 					Media:       true,
 				})
@@ -61,7 +62,7 @@ func (d *Detector) Detect(ctx context.Context) ([]domain.DetectedEngine, error) 
 			if models != nil {
 				found = append(found, domain.DetectedEngine{
 					Label:       probe.Label,
-					EndpointURL: fmt.Sprintf("http://127.0.0.1:%d/v1", probe.Port),
+					EndpointURL: fmt.Sprintf("http://%s:%d/v1", lanIP, probe.Port),
 					Models:      models,
 					Media:       false,
 				})
@@ -71,7 +72,7 @@ func (d *Detector) Detect(ctx context.Context) ([]domain.DetectedEngine, error) 
 			if models != nil {
 				found = append(found, domain.DetectedEngine{
 					Label:       probe.Label,
-					EndpointURL: fmt.Sprintf("http://127.0.0.1:%d/v1", probe.Port),
+					EndpointURL: fmt.Sprintf("http://%s:%d/v1", lanIP, probe.Port),
 					Models:      models,
 					Media:       false,
 				})
